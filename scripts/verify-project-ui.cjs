@@ -1,0 +1,48 @@
+const { app, BrowserWindow } = require('electron');
+const fs=require('node:fs');const path=require('node:path');const assert=require('node:assert/strict');
+const root=path.resolve(__dirname,'..');app.setPath('userData',path.join(root,'tmp','project-qa-profile'));
+app.whenReady().then(async()=>{
+  const win=new BrowserWindow({width:1440,height:1000,show:false,webPreferences:{contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}});
+  const run=(code)=>win.webContents.executeJavaScript(code).catch(error=>{console.error("Failed expression:",code);throw error;});
+  win.webContents.on("console-message", (event) => { if(event.level===3)console.error("Renderer:",event.message); });
+  const until=async(code)=>{for(let i=0;i<80;i++){if(await run(code))return;await new Promise(r=>setTimeout(r,50));}throw Error('Timed out: '+code);};
+  const screenshot=async(name)=>{ await new Promise(r=>setTimeout(r,250)); await run('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))'); fs.writeFileSync(path.join(root,'docs/verification',name),(await win.webContents.capturePage()).toPNG()); };
+  try{
+    await win.loadURL('http://127.0.0.1:5178');
+    await win.webContents.insertCSS('* { animation: none !important; transition: none !important; }');
+    await until("!!document.querySelector('button[aria-label=\"新建项目\"]')");
+    await run("document.querySelector('button[aria-label=\"新建项目\"]').click()");
+    await until('!!document.querySelector("#project-prompt")');
+    await run(`(()=>{ const e=document.querySelector('#project-prompt'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'关注测试展会的活动时间\\n- 活动时间'); e.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+    await until('!document.querySelector(".create-dialog footer .primary-button").disabled');
+    await run('document.querySelector(".create-dialog footer .primary-button").click()');
+    await until('!!document.querySelector("#project-depth")');
+    await run(`(()=>{const e=document.querySelector('#project-depth'); e.value='deep';e.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+    await screenshot('project-create-depth.png');
+    await run('document.querySelector(".create-dialog footer .primary-button").click()');
+    await until('document.querySelectorAll(".project-nav-item").length===2&&!document.querySelector(".create-dialog")');
+    const created=await run(`(async()=>{const {api}=await import('/src/api.ts');return (await api.projects.list()).find(p=>p.id!=='browser-demo');})()`);
+    assert.equal(created.informationDepth,'deep');assert.equal(created.updateSelected,false);
+    await run(`document.querySelector('input[aria-label="更新项目：${created.name}"]').click()`);
+    await until(`document.querySelector('input[aria-label="更新项目：${created.name}"]').checked`);
+    await run(`document.querySelector('button[aria-label="查看项目：Yorushika 演出追踪"]').click()`);
+    await until(`document.querySelector('h1')?.textContent==='Yorushika 演出追踪'`);
+    await run(`document.querySelector('button[title="只更新侧栏中勾选的项目，查看项目不会改变勾选"]').click()`);
+    await until(`!![...document.querySelectorAll('button')].find(b=>b.textContent.includes('更新选中项目（1）'))`);
+    const history=await run(`(async()=>{const {api}=await import('/src/api.ts');return {selected:await api.updates.history('${created.id}'),unselected:await api.updates.history('browser-demo'),view:document.querySelector('h1').textContent};})()`);
+    assert.equal(history.selected.length,1);assert.equal(history.unselected.length,0);assert.equal(history.view,'Yorushika 演出追踪');
+    await screenshot('project-selection.png');
+    await run(`document.querySelector('button[aria-label="查看项目：${created.name}"]').click()`);
+    await until(`document.querySelector('h1')?.textContent===${JSON.stringify(created.name)}`);
+    await run("document.querySelector('button[aria-label=\"项目设置\"]').click()");
+    await until('!!document.querySelector("#edit-project-depth")');
+    await run(`(()=>{const e=document.querySelector('#edit-project-depth');e.value='focused';e.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+    await screenshot('project-settings-depth.png');
+    await run(`document.querySelector('.settings-dialog footer .primary-button').click()`);
+    await until('!document.querySelector("#edit-project-depth")');
+    const saved=await run(`(async()=>{const {api}=await import('/src/api.ts');return(await api.projects.list()).find(p=>p.id==='${created.id}');})()`);
+    assert.equal(saved.informationDepth,'focused');assert.equal(saved.updateSelected,true);
+    fs.writeFileSync(path.join(root,'docs/verification/project-ui.json'),JSON.stringify({createdDepth:created.informationDepth,savedDepth:saved.informationDepth,selectedRuns:history.selected.length,unselectedRuns:history.unselected.length,viewPreserved:history.view},null,2));
+    console.log('PASS: create deep, select only new project, update while viewing another, only selected history changed, settings focused persisted.');
+  }catch(e){console.error(e);process.exitCode=1;}finally{win.destroy();app.exit(process.exitCode||0);}
+});

@@ -1,0 +1,4 @@
+interface:
+  display_name: "通用信息研究"
+  short_description: "Project-aware, source-backed research workflow"
+  default_prompt: "Use $general-information-research to research this project and return a source-backed current-state report."
