@@ -83,7 +83,14 @@ Invoke-Checked $builder @("--publish", "never", "--win", "dir", "--config.direct
 Copy-Item -LiteralPath $iconPath -Destination (Join-Path $appRoot "package-icon.ico") -Force
 Push-Location $appRoot
 try {
-  Invoke-CheckedWithRetry $rcedit.FullName @("OpenResearch.exe", "--set-icon", "package-icon.ico") "Failed to embed the application icon"
+  $iconExitCode = 1
+  for ($attempt = 1; $attempt -le 8; $attempt += 1) {
+    $iconProcess = Start-Process -FilePath $rcedit.FullName -ArgumentList 'OpenResearch.exe --set-icon package-icon.ico' -WorkingDirectory $appRoot -WindowStyle Hidden -Wait -PassThru
+    $iconExitCode = $iconProcess.ExitCode
+    if ($iconExitCode -eq 0) { break }
+    Start-Sleep -Milliseconds (500 * $attempt)
+  }
+  if ($iconExitCode -ne 0) { throw "Failed to embed the application icon (exit code $iconExitCode)" }
 } finally {
   Remove-Item -LiteralPath "package-icon.ico" -Force -ErrorAction SilentlyContinue
   Pop-Location
