@@ -58,7 +58,10 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           mkdir release-files
-          find artifacts -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.zip' \) -exec cp {} release-files/ \;
+          find artifacts -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.zip' \) -print0 | while IFS= read -r -d '' file; do
+            name="$(basename "$file")"
+            cp "$file" "release-files/${name// /.}"
+          done
           cd release-files
           sha256sum *.exe *.dmg *.zip > SHA256SUMS.txt
           gh release create "$GITHUB_REF_NAME" * --title "OpenResearch $GITHUB_REF_NAME" --generate-notes
