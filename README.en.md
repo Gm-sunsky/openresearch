@@ -2,6 +2,8 @@
 
 [简体中文](README.md) | **English**
 
+[Download](https://github.com/Gm-sunsky/openresearch/releases/latest) · [Report an issue](https://github.com/Gm-sunsky/openresearch/issues)
+
 OpenResearch is a local-first AI research workspace for Windows and macOS. Describe a topic, discover sources, and organize evidence on a persistent research board. Current version: **1.5.2**.
 
 ## Features

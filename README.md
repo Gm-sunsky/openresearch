@@ -2,6 +2,8 @@
 
 **简体中文** | [English](README.en.md)
 
+[下载安装包](https://github.com/Gm-sunsky/openresearch/releases/latest) · [报告问题](https://github.com/Gm-sunsky/openresearch/issues)
+
 OpenResearch 是一个本地优先的 Windows 与 macOS 信息项目工作台。用户用自然语言创建长期关注主题，应用把目标整理为项目配置，并在可拖拽白板中持续积累来源、更新、事件和分析卡片。
 
 ## 当前版本
