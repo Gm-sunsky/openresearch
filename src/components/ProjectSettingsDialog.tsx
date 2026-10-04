@@ -70,7 +70,7 @@ export function ProjectSettingsDialog({ open, project, onClose, onSave, onDelete
         <header className="flex items-start justify-between border-b border-black/[0.07] px-7 py-6">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#e15e45]">Project settings</p>
-            <h2 id="project-settings-title" className="mt-2 text-[22px] font-semibold tracking-[-0.035em] text-[#22231f]">{t("projectAgentSettings")}</h2>
+            <h2 id="project-settings-title" className="mt-2 text-[22px] font-semibold tracking-[-0.035em] theme-text-primary">{t("projectAgentSettings")}</h2>
           </div>
           <button className="dialog-close" type="button" onClick={onClose} aria-label="关闭"><CloseIcon className="h-4 w-4" /></button>
         </header>
@@ -90,7 +90,7 @@ export function ProjectSettingsDialog({ open, project, onClose, onSave, onDelete
             <select id="edit-project-depth" className="text-field mt-2" value={form.informationDepth} aria-describedby="edit-project-depth-hint" onChange={(event) => setForm({ ...form, informationDepth: normalizeInformationDepth(event.target.value) })}>
               {Object.entries(INFORMATION_DEPTH_POLICIES).map(([value, policy]) => <option key={value} value={value}>{policy.label}</option>)}
             </select>
-            <p id="edit-project-depth-hint" className="mt-2 text-[10px] leading-5 text-[#85837c]">{informationDepthPolicy(form.informationDepth).guidance}</p>
+            <p id="edit-project-depth-hint" className="mt-2 text-[10px] leading-5 theme-text-secondary">{informationDepthPolicy(form.informationDepth).guidance}</p>
           </div>
           <div className="col-span-2">
             <label className="field-label" htmlFor="edit-project-description">{t("description")}</label>

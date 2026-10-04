@@ -385,7 +385,7 @@ export default function App() {
   };
 
   return (
-    <main className="flex h-screen min-h-[680px] overflow-hidden bg-[#f1efe9] text-[#252620]">
+    <main className="app-workspace flex h-screen min-h-[680px] overflow-hidden theme-text-primary">
       <ProjectSidebar
         projects={projects}
         selectedId={selectedId}
@@ -402,16 +402,16 @@ export default function App() {
           <>
             <header className="workspace-header flex h-[72px] shrink-0 items-center justify-between border-b border-black/[0.07] px-6">
               <div className="min-w-0">
-                <div className="flex items-center gap-1 text-[9px] font-medium uppercase tracking-[0.13em] text-[#aaa79e]">
+                <div className="flex items-center gap-1 text-[9px] font-medium uppercase tracking-[0.13em] theme-text-muted">
                   {t("projects")} <ChevronIcon className="h-3 w-3" /> {t("activeBoard")}
                 </div>
                 <div className="mt-1.5 flex items-center gap-3">
-                  <h1 className="truncate text-[19px] font-semibold tracking-[-0.035em] text-[#252620]">{project.name}</h1>
+                  <h1 className="truncate text-[19px] font-semibold tracking-[-0.035em] theme-text-primary">{project.name}</h1>
                   <button className={`status-badge ${project.status}`} type="button" onClick={() => void toggleProject()} title={t("projectSettings")}><span />{project.status === "active" ? t("active") : t("paused")}</button>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="mr-2 hidden text-[10px] text-[#9a988f] xl:block">{informationDepthPolicy(project.informationDepth).label} · {project.updateSelected ? "已选更新 · " + frequencyLabel(project.updateFrequency, locale) : "未选更新"}</span>
+                <span className="mr-2 hidden text-[10px] theme-text-secondary xl:block">{informationDepthPolicy(project.informationDepth).label} · {project.updateSelected ? "已选更新 · " + frequencyLabel(project.updateFrequency, locale) : "未选更新"}</span>
                 <button className="secondary-button" type="button" onClick={addNote}><PlusIcon className="h-3.5 w-3.5" />{t("newCard")}</button>
                 <button className="primary-button" type="button" disabled={selectionSaving || !readyForUpdate.length} onClick={() => void runUpdate()} title="只更新侧栏中勾选的项目，查看项目不会改变勾选">
                   <RefreshIcon className={"h-3.5 w-3.5 " + (updatingIds.size ? "animate-spin" : "")} />{readyForUpdate.length ? "更新选中项目（" + readyForUpdate.length + "）" : updatingIds.size ? "更新中（" + updatingIds.size + "）" : "请勾选更新项目"}
@@ -465,8 +465,8 @@ export default function App() {
           <section className="flex flex-1 items-center justify-center">
             <div className="max-w-[430px] text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-black/10 bg-white text-[#e15e45]"><SparkIcon className="h-5 w-5" /></div>
-              <h1 className="mt-6 text-[27px] font-semibold tracking-[-0.04em] text-[#292a25]">{t("createFirst")}</h1>
-              <p className="mt-3 text-[13px] leading-6 text-[#85837b]">{t("createFirstHint")}</p>
+              <h1 className="mt-6 text-[27px] font-semibold tracking-[-0.04em] theme-text-primary">{t("createFirst")}</h1>
+              <p className="mt-3 text-[13px] leading-6 theme-text-secondary">{t("createFirstHint")}</p>
               <button className="primary-button mx-auto mt-6" type="button" onClick={() => setCreateOpen(true)}><PlusIcon className="h-4 w-4" />{t("newProject")}</button>
             </div>
           </section>

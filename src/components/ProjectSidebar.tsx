@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import type { Project } from "../shared/contracts";
 import { BoardIcon, PlusIcon, RefreshIcon, SearchIcon, SettingsIcon, SparkIcon } from "./Icons";
 import { useI18n } from "../i18n";
@@ -14,7 +15,39 @@ interface ProjectSidebarProps {
 }
 
 export function ProjectSidebar({ projects, selectedId, onSelect, onToggleUpdate, updatingIds, selectionSaving, onCreate, onSettings }: ProjectSidebarProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const searchInput = useRef<HTMLInputElement>(null);
+  const searchButton = useRef<HTMLButtonElement>(null);
+  const chinese = locale.startsWith("zh");
+  const searchTerms = query.trim().toLocaleLowerCase(locale).split(/\s+/).filter(Boolean);
+  const visibleProjects = projects.filter((project) => {
+    const text = [project.name, project.description, project.goal, ...project.focus].join(" ").toLocaleLowerCase(locale);
+    return searchTerms.every((term) => text.includes(term));
+  });
+
+  useEffect(() => {
+    if (searchOpen) searchInput.current?.focus();
+  }, [searchOpen]);
+
+  useEffect(() => {
+    function handleShortcut(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setSearchOpen(true);
+        searchInput.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, []);
+
+  function closeSearch() {
+    setQuery("");
+    setSearchOpen(false);
+    searchButton.current?.focus();
+  }
   return (
     <aside className="sidebar flex h-full w-[248px] shrink-0 flex-col">
       <div className="flex h-[72px] items-center gap-3 px-5">
@@ -26,11 +59,32 @@ export function ProjectSidebar({ projects, selectedId, onSelect, onToggleUpdate,
       </div>
 
       <div className="px-3 pt-2">
-        <button className="sidebar-action" type="button">
+        <button ref={searchButton} className="sidebar-action" type="button" onClick={() => {
+          setSearchOpen(true);
+          searchInput.current?.focus();
+        }} aria-expanded={searchOpen} aria-controls="project-search">
           <SearchIcon className="h-4 w-4" />
           {t("searchProjects")}
-          <span className="ml-auto rounded border border-white/10 px-1.5 py-0.5 text-[9px] text-white/35">⌘ K</span>
+          <span className="ml-auto rounded border border-white/10 px-1.5 py-0.5 text-[9px] text-white/35">Ctrl / ⌘ K</span>
         </button>
+        {searchOpen && <div id="project-search" className="mt-2 flex items-center gap-1 rounded-lg border border-white/15 px-2 py-1">
+          <input ref={searchInput} type="search" value={query} onChange={(event) => setQuery(event.target.value)}
+            aria-label={t("searchProjects")} placeholder={chinese ? "名称、简介、目标或关注项" : "Name, description, goal or focus"}
+            className="min-w-0 flex-1 bg-transparent py-1 text-[11px] text-white outline-none placeholder:text-white/40"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                closeSearch();
+              } else if (event.key === "Enter" && visibleProjects.length > 0) {
+                event.preventDefault();
+                onSelect(visibleProjects[0].id);
+                closeSearch();
+              }
+            }} />
+          {query && <button type="button" className="sidebar-icon-button" aria-label={chinese ? "清空项目搜索" : "Clear project search"}
+            onClick={() => { setQuery(""); searchInput.current?.focus(); }}>×</button>}
+          <button type="button" className="sidebar-icon-button text-[10px]" aria-label={chinese ? "关闭项目搜索" : "Close project search"} onClick={closeSearch}>Esc</button>
+        </div>}
         <button className="sidebar-action active" type="button">
           <BoardIcon className="h-4 w-4" />
           {t("projects")}
@@ -47,7 +101,12 @@ export function ProjectSidebar({ projects, selectedId, onSelect, onToggleUpdate,
 
       <p className="mt-2 px-5 text-[10px] leading-4 text-white/40">勾选参与更新，点击名称查看</p>
       <nav className="mt-2 flex-1 overflow-y-auto px-3 pb-3" aria-label="信息项目">
-        {projects.map((project) => {
+        {searchOpen && <p role="status" className="px-2 pb-2 text-[10px] text-white/40">
+          {visibleProjects.length === 0
+            ? (chinese ? "没有匹配的项目，请尝试其他关键词。" : "No matching projects. Try another search.")
+            : (chinese ? `找到 ${visibleProjects.length} 个项目` : `${visibleProjects.length} projects found`)}
+        </p>}
+        {visibleProjects.map((project) => {
           const selected = project.id === selectedId;
           const updating = updatingIds.has(project.id);
           return (

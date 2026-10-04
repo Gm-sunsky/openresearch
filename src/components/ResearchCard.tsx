@@ -313,7 +313,7 @@ export function ResearchCard({
           </div>
         </header>
         <div className="card-switch-content" key={card.id}>
-          <h2 className="card-title mt-5 text-[17px] font-semibold leading-[1.25] tracking-[-0.025em] text-[#20211e]">{card.title}</h2>
+          <h2 className="card-title mt-5 text-[17px] font-semibold leading-[1.25] tracking-[-0.025em] theme-text-primary">{card.title}</h2>
           {layout.showImage && (
             <div className="card-image-frame" style={{ height: layout.imageHeight }}>
               <img
@@ -337,11 +337,11 @@ export function ResearchCard({
             </div>
           )}
           {!layout.compact && card.sourceUrl && <span className="card-summary-label">{t("coreInfo")}</span>}
-          {layout.contentLines > 0 && <p className="card-content whitespace-pre-line text-[12px] leading-[1.7] text-[#5d5d57]" style={{ WebkitLineClamp: layout.contentLines }}>{card.content}</p>}
+          {layout.contentLines > 0 && <p className="card-content whitespace-pre-line text-[12px] leading-[1.7] theme-text-secondary" style={{ WebkitLineClamp: layout.contentLines }}>{card.content}</p>}
           <footer className="mt-auto flex items-end justify-between gap-3 pt-5">
             <div className="min-w-0">
-              {card.sourceName && <p className="truncate text-[10px] font-medium text-[#5b5c57]">{card.sourceName}</p>}
-              <p className="mt-0.5 text-[9px] text-[#a09e95]">{card.updateBatchAt ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(card.updateBatchAt)) : formatRelativeTime(card.occurredAt ?? card.createdAt, locale)}</p>
+              {card.sourceName && <p className="truncate text-[10px] font-medium theme-text-secondary">{card.sourceName}</p>}
+              <p className="mt-0.5 text-[9px] theme-text-muted">{card.updateBatchAt ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(card.updateBatchAt)) : formatRelativeTime(card.occurredAt ?? card.createdAt, locale)}</p>
             </div>
             {sourceLinks.length > 0 && (
               <div className="source-cluster">

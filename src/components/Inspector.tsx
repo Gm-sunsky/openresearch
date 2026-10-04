@@ -2,8 +2,17 @@ import { useEffect, useState, type FormEvent } from "react";
 import { formatRelativeTime, frequencyLabel } from "../lib/format";
 import type { Card, CreateSourceInput, InformationChange, Project, Source, SourceCandidate, SourceType, TaskRun, UpdateCardInput } from "../shared/contracts";
 import { AlertIcon, CheckIcon, ChevronIcon, ExternalIcon, LinkIcon, PlusIcon, SparkIcon, TrashIcon } from "./Icons";
+import { api } from "../api";
 import { useI18n } from "../i18n";
 import { sourcePlatformLabel } from "../shared/source-platform";
+
+function editableDate(value: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
 interface InspectorProps {
   project: Project;
@@ -53,6 +62,8 @@ export function Inspector({
   onJumpToChange,
 }: InspectorProps) {
   const { t, locale } = useI18n();
+  const [openingData, setOpeningData] = useState(false);
+  const [dataError, setDataError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [type, setType] = useState<SourceType>("rss");
   const [name, setName] = useState("");
@@ -72,6 +83,19 @@ export function Inspector({
       importance: selectedCard.importance,
     } : null);
   }, [selectedCard]);
+
+  const openDataFolder = async () => {
+    if (openingData) return;
+    setOpeningData(true);
+    setDataError(null);
+    try {
+      await api.maintenance.openDataFolder();
+    } catch (reason) {
+      setDataError(reason instanceof Error ? reason.message : t("dataFolderError"));
+    } finally {
+      setOpeningData(false);
+    }
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -101,8 +125,13 @@ export function Inspector({
           </select>
           <input className="compact-field mt-2" value={cardForm.title} onChange={(event) => setCardForm({ ...cardForm, title: event.target.value })} placeholder="标题" />
           <textarea className="compact-area mt-2" value={cardForm.content} onChange={(event) => setCardForm({ ...cardForm, content: event.target.value })} placeholder="卡片内容" />
+          <label className="field-label mt-3 block" htmlFor="card-event-date">{t("eventDate")}</label>
+          <input id="card-event-date" className="compact-field mt-2" type="datetime-local" value={editableDate(cardForm.occurredAt ?? null)} onChange={(event) => {
+            setCardForm({ ...cardForm, occurredAt: event.target.value ? new Date(event.target.value).toISOString() : null });
+          }} />
+          <p className="theme-text-muted mt-1 text-[9px] leading-4">{t("eventDateHint")}</p>
           <div className="mt-2 flex items-center justify-between gap-2">
-            <label className="text-[9px] text-[#96948c]" htmlFor="card-importance">{t("importance")}</label>
+            <label className="text-[9px] theme-text-secondary" htmlFor="card-importance">{t("importance")}</label>
             <select id="card-importance" className="h-7 rounded-md border border-black/10 bg-white px-2 text-[9px]" value={cardForm.importance} onChange={(event) => setCardForm({ ...cardForm, importance: Number(event.target.value) })}>
               <option value="1">{t("general")}</option><option value="2">{t("important")}</option><option value="3">{t("critical")}</option>
             </select>
@@ -121,9 +150,9 @@ export function Inspector({
           <p className="inspector-heading">{t("changesTitle")}</p>
           {changes.filter((change) => !change.resolved).length > 0 && <span className="candidate-count">{changes.filter((change) => !change.resolved).length}</span>}
         </div>
-        <p className="mt-2 text-[9px] leading-4 text-[#9b988f]">{t("changesHint")}</p>
+        <p className="mt-2 text-[9px] leading-4 theme-text-secondary">{t("changesHint")}</p>
         <div className="mt-3 space-y-2">
-          {changes.length === 0 && <p className="text-[9px] text-[#aaa79e]">{t("noChanges")}</p>}
+          {changes.length === 0 && <p className="text-[9px] theme-text-muted">{t("noChanges")}</p>}
           {changes.slice(0, 12).map((change) => (
             <article className={`change-row ${change.kind} ${change.resolved ? "resolved" : ""}`} key={change.id}>
               <button className="change-row-target" type="button" onClick={() => onJumpToChange(change)}>
@@ -136,7 +165,7 @@ export function Inspector({
       </section>
       <section className="border-b border-black/[0.07] px-5 py-5">
         <p className="inspector-heading">{t("projectGoal")}</p>
-        <p className="mt-3 text-[12px] leading-[1.7] text-[#5f605a]">{project.goal}</p>
+        <p className="mt-3 text-[12px] leading-[1.7] theme-text-secondary">{project.goal}</p>
         <div className="mt-4 flex flex-wrap gap-1.5">
           {project.focus.map((item) => <span className="inspector-tag" key={item}>{item}</span>)}
         </div>
@@ -146,7 +175,7 @@ export function Inspector({
         <div className="flex items-center justify-between">
           <div>
             <p className="inspector-heading">{t("sources")}</p>
-            <p className="mt-1 text-[9px] text-[#aaa89e]">{sources.length} · {frequencyLabel(project.updateFrequency, locale)}</p>
+            <p className="mt-1 text-[9px] theme-text-muted">{sources.length} · {frequencyLabel(project.updateFrequency, locale)}</p>
           </div>
           <div className="flex items-center gap-1.5">
             <button className="discover-button" type="button" disabled={discovering} onClick={onDiscover}>
@@ -185,7 +214,7 @@ export function Inspector({
         {candidates.length > 0 && (
           <div className="candidate-panel mt-4">
             <div className="flex items-center justify-between px-1">
-              <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[#8b8981]">{t("pendingSources")}</p>
+              <p className="text-[9px] font-semibold uppercase tracking-[0.12em] theme-text-secondary">{t("pendingSources")}</p>
               <span className="candidate-count">{candidates.length}</span>
             </div>
             <div className="mt-2 space-y-2">
@@ -194,13 +223,13 @@ export function Inspector({
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <p className="truncate text-[10px] font-semibold text-[#4e4f49]">{candidate.name}</p>
+                        <p className="truncate text-[10px] font-semibold theme-text-primary">{candidate.name}</p>
                         {candidate.verified && <span className="verified-badge"><CheckIcon className="h-2.5 w-2.5" />已验证</span>}
                       </div>
-                      <p className="mt-1 truncate text-[8px] uppercase tracking-[0.08em] text-[#aaa79e]">{sourcePlatformLabel(candidate.platform)} · {candidate.type} · {Math.round(candidate.confidence * 100)}% 可信</p>
+                      <p className="mt-1 truncate text-[8px] uppercase tracking-[0.08em] theme-text-muted">{sourcePlatformLabel(candidate.platform)} · {candidate.type} · {Math.round(candidate.confidence * 100)}% 可信</p>
                     </div>
                   </div>
-                  <p className="mt-2 text-[9px] leading-4 text-[#828078]">{candidate.rationale}</p>
+                  <p className="mt-2 text-[9px] leading-4 theme-text-secondary">{candidate.rationale}</p>
                   <div className="mt-2 flex justify-end gap-1">
                     <button className="mini-button" type="button" onClick={() => void onDismissCandidate(candidate.id)}>{t("ignore")}</button>
                     <button className="mini-button primary" type="button" onClick={() => void onAcceptCandidate(candidate.id)}>{t("addSource")}</button>
@@ -222,8 +251,8 @@ export function Inspector({
             <div className="source-row group" key={source.id}>
               <div className={`source-status ${source.status}`} />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[11px] font-medium text-[#4c4d48]">{source.name}</p>
-                <p className="mt-0.5 truncate text-[9px] text-[#aaa89f]">{sourcePlatformLabel(source.platform)}{source.type === "search" ? ` · ${t("searchSource")}` : ""} · {formatRelativeTime(source.lastCheckedAt, locale)}</p>
+                <p className="truncate text-[11px] font-medium theme-text-primary">{source.name}</p>
+                <p className="mt-0.5 truncate text-[9px] theme-text-muted">{sourcePlatformLabel(source.platform)}{source.type === "search" ? ` · ${t("searchSource")}` : ""} · {formatRelativeTime(source.lastCheckedAt, locale)}</p>
                 {source.lastError && <p className="mt-1 truncate text-[9px] text-[#bf4937]">{source.lastError}</p>}
               </div>
               <button className="source-action opacity-0 group-hover:opacity-100" type="button" onClick={() => void (source.status === "error" ? onRetrySource(source) : onToggleSource(source))}>
@@ -240,14 +269,15 @@ export function Inspector({
       <section className="px-5 py-5">
         <p className="inspector-heading">{t("workStatus")}</p>
         <dl className="mt-4 space-y-3">
-          <div className="flex items-center justify-between"><dt className="text-[10px] text-[#96948c]">Agent</dt><dd className="flex items-center gap-1.5 text-[10px] font-medium text-[#4d4e49]"><span className={`h-1.5 w-1.5 rounded-full ${project.status === "active" ? "bg-[#5d8468]" : "bg-[#aaa79e]"}`} />{project.status === "active" ? "运行中" : "已暂停"}</dd></div>
-          <div className="flex items-center justify-between"><dt className="text-[10px] text-[#96948c]">{t("cardCount")}</dt><dd className="text-[10px] font-medium text-[#4d4e49]">{project.cardCount}</dd></div>
-          <div className="flex items-center justify-between"><dt className="text-[10px] text-[#96948c]">{t("dataLocation")}</dt><dd className="flex items-center gap-1 text-[10px] font-medium text-[#4d4e49]">{t("thisDevice")} <ExternalIcon className="h-3 w-3" /></dd></div>
+          <div className="flex items-center justify-between"><dt className="text-[10px] theme-text-secondary">Agent</dt><dd className="flex items-center gap-1.5 text-[10px] font-medium theme-text-primary"><span className={`h-1.5 w-1.5 rounded-full ${project.status === "active" ? "bg-[#5d8468]" : "bg-[#aaa79e]"}`} />{project.status === "active" ? "运行中" : "已暂停"}</dd></div>
+          <div className="flex items-center justify-between"><dt className="text-[10px] theme-text-secondary">{t("cardCount")}</dt><dd className="text-[10px] font-medium theme-text-primary">{project.cardCount}</dd></div>
+          <div className="flex items-center justify-between"><dt className="text-[10px] theme-text-secondary">{t("dataLocation")}</dt><dd><button className="data-folder-link" type="button" title={t("openDataFolder")} aria-label={t("openDataFolder")} disabled={openingData} onClick={() => void openDataFolder()}>{openingData ? t("openingDataFolder") : t("thisDevice")} <ExternalIcon className="h-3 w-3" /></button></dd></div>
         </dl>
+        {dataError && <p className="data-folder-error" role="alert">{dataError}</p>}
         <div className="mt-5 border-t border-black/[0.06] pt-4">
           <p className="inspector-heading">{t("recentTasks")}</p>
           <div className="mt-3 space-y-2">
-            {taskRuns.length === 0 && <p className="text-[9px] leading-4 text-[#aaa79e]">{t("noTasks")}</p>}
+            {taskRuns.length === 0 && <p className="text-[9px] leading-4 theme-text-muted">{t("noTasks")}</p>}
             {taskRuns.slice(0, 5).map((run) => (
               <article className="task-run" key={run.id} title={[...run.errors, ...run.warnings].join("\n")}>
                 <div className="flex items-center justify-between gap-2">

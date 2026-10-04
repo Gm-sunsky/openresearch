@@ -108,8 +108,8 @@ export function SettingsDialog({ open, settings, onClose, onSaved }: SettingsDia
         <header className="flex items-start justify-between border-b border-black/[0.07] px-7 py-6">
           <div>
             <div className="flex items-center gap-2 text-[#e15e45]"><KeyIcon className="h-4 w-4" /><span className="text-[10px] font-semibold uppercase tracking-[0.16em]">AI connection</span></div>
-            <h2 id="api-settings-title" className="mt-2 text-[22px] font-semibold tracking-[-0.035em] text-[#22231f]">{t("apiAutomation")}</h2>
-            <p className="mt-1 text-[12px] text-[#85837c]">连接 AI 服务，让来源发现 Agent 主动寻找并核验信息源。</p>
+            <h2 id="api-settings-title" className="mt-2 text-[22px] font-semibold tracking-[-0.035em] theme-text-primary">{t("apiAutomation")}</h2>
+            <p className="mt-1 text-[12px] theme-text-secondary">连接 AI 服务，让来源发现 Agent 主动寻找并核验信息源。</p>
           </div>
           <button className="dialog-close" type="button" onClick={onClose} aria-label="关闭"><CloseIcon className="h-4 w-4" /></button>
         </header>
@@ -128,7 +128,7 @@ export function SettingsDialog({ open, settings, onClose, onSaved }: SettingsDia
               <div>
                 <label className="field-label" htmlFor="max-batches">{t("maxBatches")}</label>
                 <input id="max-batches" className="text-field mt-2" type="number" min="1" max="200" value={form.maxUpdateBatches} onChange={(event) => setForm({ ...form, maxUpdateBatches: Number(event.target.value) || 20 })} />
-                <p className="mt-1.5 text-[8px] leading-4 text-[#aaa79e]">{t("maxBatchesHint")}</p>
+                <p className="mt-1.5 text-[8px] leading-4 theme-text-muted">{t("maxBatchesHint")}</p>
               </div>
             </div>
             <div>
@@ -183,7 +183,7 @@ export function SettingsDialog({ open, settings, onClose, onSaved }: SettingsDia
 
           <aside className="bg-[#f4f2ed] p-6">
             <div className="security-note">
-              <ShieldIcon className="h-4 w-4 text-[#62806a]" />
+              <ShieldIcon className="h-4 w-4 theme-text-secondary" />
               <div><strong>密钥留在此设备</strong><p>使用系统安全存储加密，不会发送到界面或写入日志。</p></div>
             </div>
             <p className="field-label mt-7">{t("automation")}</p>
@@ -199,21 +199,21 @@ export function SettingsDialog({ open, settings, onClose, onSaved }: SettingsDia
               <input type="checkbox" checked={form.autoAddVerifiedSources} onChange={(event) => setForm({ ...form, autoAddVerifiedSources: event.target.checked })} />
               <span><strong>自动添加高可信来源</strong><small>仅添加已连通且置信度较高的来源。</small></span>
             </label>
-            <div className="mt-7 border-t border-black/[0.07] pt-4 text-[10px] leading-5 text-[#929087]">
-              <p className="flex items-center gap-1.5"><CheckIcon className="h-3 w-3 text-[#62806a]" />候选网址经过安全检查</p>
-              <p className="mt-1 flex items-center gap-1.5"><CheckIcon className="h-3 w-3 text-[#62806a]" />默认不自动添加来源</p>
+            <div className="mt-7 border-t border-black/[0.07] pt-4 text-[10px] leading-5 theme-text-secondary">
+              <p className="flex items-center gap-1.5"><CheckIcon className="h-3 w-3 theme-text-secondary" />候选网址经过安全检查</p>
+              <p className="mt-1 flex items-center gap-1.5"><CheckIcon className="h-3 w-3 theme-text-secondary" />默认不自动添加来源</p>
             </div>
             <div className="mt-6 border-t border-black/[0.07] pt-4">
               <p className="field-label">本地数据</p>
               <button className="secondary-button mt-3 w-full" type="button" disabled={busy !== null} onClick={() => void createBackup()}>{busy === "backup" ? "备份中…" : "立即创建备份"}</button>
               <button className="mini-button mt-2 w-full" type="button" onClick={() => void openDataFolder()}>打开数据目录</button>
-              <p className="mt-2 text-[8px] leading-4 text-[#aaa79e]">软件每天自动保留一份备份，最多保存最近 10 份。</p>
+              <p className="mt-2 text-[8px] leading-4 theme-text-muted">软件每天自动保留一份备份，最多保存最近 10 份。</p>
             </div>
           </aside>
         </div>
 
         <footer className="flex min-h-[67px] items-center justify-between border-t border-black/[0.07] px-7 py-4">
-          <p className={`max-w-[400px] text-[10px] ${message?.error ? "text-[#bf4937]" : "text-[#66806c]"}`}>{message?.text ?? "修改密钥时请先测试连接，再保存设置。"}</p>
+          <p className={`max-w-[400px] text-[10px] ${message?.error ? "text-[#bf4937]" : "theme-text-secondary"}`}>{message?.text ?? "修改密钥时请先测试连接，再保存设置。"}</p>
           <div className="flex gap-2">
             <button className="secondary-button" type="button" disabled={busy !== null} onClick={test}>{busy === "test" ? "测试中…" : t("testConnection")}</button>
             <button className="primary-button" type="button" disabled={busy !== null || !form.model.trim()} onClick={save}>{busy === "save" ? t("saving") : t("saveSettings")}</button>

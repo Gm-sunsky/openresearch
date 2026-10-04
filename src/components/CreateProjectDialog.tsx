@@ -67,8 +67,8 @@ export function CreateProjectDialog({ open, onClose, onCreated }: CreateProjectD
         <header className="flex items-start justify-between border-b border-black/[0.07] px-7 py-6">
           <div>
             <div className="flex items-center gap-2 text-[#e15e45]"><SparkIcon className="h-4 w-4" /><span className="text-[10px] font-semibold uppercase tracking-[0.16em]">Project agent</span></div>
-            <h2 id="create-project-title" className="mt-2 text-[22px] font-semibold tracking-[-0.035em] text-[#22231f]">{t("createProject")}</h2>
-            <p className="mt-1 text-[12px] text-[#85837c]">{t("createProjectHint")}</p>
+            <h2 id="create-project-title" className="mt-2 text-[22px] font-semibold tracking-[-0.035em] theme-text-primary">{t("createProject")}</h2>
+            <p className="mt-1 text-[12px] theme-text-secondary">{t("createProjectHint")}</p>
           </div>
           <button className="dialog-close" type="button" onClick={onClose} aria-label="关闭"><CloseIcon className="h-4 w-4" /></button>
         </header>
@@ -96,7 +96,7 @@ export function CreateProjectDialog({ open, onClose, onCreated }: CreateProjectD
                 <input id="project-name" className="text-field mt-2" value={name} onChange={(event) => setName(event.target.value)} />
                 <div className="mt-6">
                   <p className="preview-label">{t("monitoringGoal")}</p>
-                  <p className="mt-1.5 text-[12px] leading-5 text-[#4f504b]">{draft.goal}</p>
+                  <p className="mt-1.5 text-[12px] leading-5 theme-text-primary">{draft.goal}</p>
                 </div>
                 <div className="mt-5">
                   <p className="preview-label">{t("focusScope")}</p>
@@ -109,25 +109,25 @@ export function CreateProjectDialog({ open, onClose, onCreated }: CreateProjectD
                   <select id="project-depth" className="text-field mt-2" value={draft.informationDepth} aria-describedby="project-depth-hint" onChange={(event) => setDraft({ ...draft, informationDepth: normalizeInformationDepth(event.target.value) })}>
                     {Object.entries(INFORMATION_DEPTH_POLICIES).map(([value, policy]) => <option key={value} value={value}>{policy.label}</option>)}
                   </select>
-                  <p id="project-depth-hint" className="mt-2 text-[10px] leading-5 text-[#85837c]">{informationDepthPolicy(draft.informationDepth).guidance}</p>
+                  <p id="project-depth-hint" className="mt-2 text-[10px] leading-5 theme-text-secondary">{informationDepthPolicy(draft.informationDepth).guidance}</p>
                 </div>
                 <div className="mt-5 flex items-center justify-between border-t border-black/[0.07] pt-4">
                   <span className="preview-label">自动检查</span>
-                  <span className="text-[11px] font-medium text-[#484944]">{frequencyLabel(draft.updateFrequency, locale)}</span>
+                  <span className="text-[11px] font-medium theme-text-primary">{frequencyLabel(draft.updateFrequency, locale)}</span>
                 </div>
               </div>
             ) : (
               <div className="flex h-[310px] flex-col items-center justify-center text-center">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white text-[#aaa79e]"><SparkIcon className="h-4 w-4" /></div>
-                <p className="mt-4 text-[12px] font-medium text-[#6b6a64]">{t("waitingAnalysis")}</p>
-                <p className="mt-1 max-w-[210px] text-[10px] leading-5 text-[#a09e96]">{t("waitingAnalysisHint")}</p>
+                <div className="flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white theme-text-muted"><SparkIcon className="h-4 w-4" /></div>
+                <p className="mt-4 text-[12px] font-medium theme-text-secondary">{t("waitingAnalysis")}</p>
+                <p className="mt-1 max-w-[210px] text-[10px] leading-5 theme-text-muted">{t("waitingAnalysisHint")}</p>
               </div>
             )}
           </div>
         </div>
 
         <footer className="flex items-center justify-between border-t border-black/[0.07] px-7 py-4">
-          <span className="text-[10px] text-[#aaa89f]">{t("noApiNeeded")}</span>
+          <span className="text-[10px] theme-text-muted">{t("noApiNeeded")}</span>
           <div className="flex gap-2">
             <button className="secondary-button" type="button" onClick={onClose}>{t("cancel")}</button>
             {draft ? (

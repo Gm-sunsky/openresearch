@@ -102,12 +102,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .research-card.dragging { cursor: grabbing; border-color: rgba(225,94,69,.32); box-shadow: 0 16px 38px rgba(35,33,27,.16); transition: box-shadow .12s ease; }
 .research-card.resizing { cursor: default; border-color: rgba(225,94,69,.38); box-shadow: 0 0 0 2px rgba(225,94,69,.07), 0 16px 38px rgba(35,33,27,.13); transition: none; }
 .research-card.packed { box-shadow: 0 5px 16px rgba(35,33,27,.075), 0 18px 42px rgba(35,33,27,.04); }
-.research-card.type-analysis { background: #292a27; border-color: #292a27; }
-.research-card.type-analysis h2 { color: rgba(255,255,255,.94); }
-.research-card.type-analysis .card-content { color: rgba(255,255,255,.56); }
-.research-card.type-analysis .card-kind, .research-card.type-analysis footer p { color: rgba(255,255,255,.42); }
-.research-card.type-analysis .card-menu { color: rgba(255,255,255,.28); }
-.research-card.type-analysis .source-link { border-color: rgba(255,255,255,.1); color: rgba(255,255,255,.4); }
 .research-card.type-event { border-top: 2px solid #e15e45; }
 .research-card.change-updated { border-color: rgba(187,128,43,.48); box-shadow: 0 0 0 2px rgba(187,128,43,.07), 0 12px 34px rgba(35,33,27,.09); }
 .research-card.change-conflict { border-color: rgba(191,73,55,.68); box-shadow: 0 0 0 3px rgba(191,73,55,.09), 0 12px 34px rgba(35,33,27,.1); animation: conflict-in .5s ease both; }
@@ -141,7 +135,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .research-card:hover .card-grip { opacity: 1; }
 .card-kind { display: inline-flex; align-items: center; gap: 5px; color: #9b988f; font-size: 9px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
 .card-focus-category { overflow: hidden; max-width: 112px; border-left: 1px solid rgba(36,37,33,.1); padding-left: 8px; color: #77766f; font-size: 9px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.research-card.type-analysis .card-focus-category { border-left-color: rgba(255,255,255,.12); color: rgba(255,255,255,.55); }
 .card-menu { display: flex; height: 22px; width: 22px; align-items: center; justify-content: center; border-radius: 5px; color: #b6b3aa; opacity: 0; transition: .14s ease; }
 .research-card:hover .card-menu { opacity: 1; }
 .research-card.packed .card-menu, .card-menu[aria-expanded="true"] { opacity: 1; }
@@ -167,13 +160,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .card-action-menu button.danger { color: #b65343; }
 .card-action-menu button.danger:hover { background: rgba(191,73,55,.07); }
 .menu-divider { margin: 4px; border-top: 1px solid rgba(35,36,32,.07); }
-.research-card.type-analysis .pack-navigation { border-color: rgba(255,255,255,.1); background: rgba(255,255,255,.04); color: rgba(255,255,255,.5); }
 .card-content { display: -webkit-box; min-height: 0; overflow: hidden; margin-top: 7px; -webkit-box-orient: vertical; }
 .research-card.compact { padding: 14px 15px 12px; }
 .research-card.compact .card-title { margin-top: 12px; font-size: 15px; }
 .research-card.compact .card-content { margin-top: 8px; font-size: 11px; line-height: 1.55; }
 .research-card.compact footer { padding-top: 10px; }
-.research-card.type-analysis .card-summary-label { color: rgba(255,255,255,.34); }
 .card-resize-handle { position: absolute; z-index: 70; touch-action: none; opacity: 0; transition: opacity .14s ease; }
 .card-pack-shell:hover .card-resize-handle, .card-pack-shell.resizing .card-resize-handle, .card-pack-shell:focus-within .card-resize-handle { opacity: 1; }
 .resize-n, .resize-s { left: 12px; right: 12px; height: 8px; cursor: ns-resize; }
@@ -206,8 +197,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .source-popover > button:hover { background: rgba(225,94,69,.055); color: #d35740; }
 .source-popover > button span { overflow: hidden; font-size: 9px; font-weight: 620; text-overflow: ellipsis; white-space: nowrap; }
 .source-popover > button small { overflow: hidden; max-width: 82px; color: #aaa79e; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
-.research-card.type-analysis .source-popover { border-color: rgba(255,255,255,.1); background: rgba(42,43,40,.98); }
-.research-card.type-analysis .source-popover header, .research-card.type-analysis .source-popover > button { color: rgba(255,255,255,.7); }
 .board-tools { pointer-events: none; }
 .board-tools > * { pointer-events: auto; }
 .board-filter { border: 1px solid rgba(36,37,33,.09); border-radius: 7px; background: rgba(250,249,245,.86); padding: 2px; box-shadow: 0 2px 9px rgba(35,33,27,.04); backdrop-filter: blur(8px); }

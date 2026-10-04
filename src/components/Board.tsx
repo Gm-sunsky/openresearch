@@ -7,6 +7,7 @@ import { ResearchCard } from "./ResearchCard";
 import { useI18n } from "../i18n";
 import { activeUpdateBatch, buildUpdateBatchRegions } from "../lib/update-batches";
 import { cardNavigationTarget } from "../lib/card-navigation";
+import { Timeline } from "./Timeline";
 
 export interface CardFocusRequest {
   cardId: string;
@@ -38,6 +39,8 @@ export function Board({ cards, loading, onMove, onResize, onAddNote, selectedCar
   const { t, locale } = useI18n();
   const [filter, setFilter] = useState<CardFilter>("all");
   const [query, setQuery] = useState("");
+  const [view, setView] = useState<"board" | "timeline">("board");
+  const [timelineFocus, setTimelineFocus] = useState<CardFocusRequest | null>(null);
   const [packIndexes, setPackIndexes] = useState<Record<string, number>>({});
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
@@ -46,6 +49,7 @@ export function Board({ cards, loading, onMove, onResize, onAddNote, selectedCar
   const previousNewestBatch = useRef<string | null>(null);
   const handledFocusRequest = useRef<number | null>(null);
   const highlightTimer = useRef<number | null>(null);
+  const timelineRequestId = useRef(0);
   const matchedIds = useMemo(() => new Set(filterCards(cards, filter, query).map((card) => card.id)), [cards, filter, query]);
   const visibleBundles = useMemo(() => groupCardBundles(cards).filter((bundle) => bundle.cards.some((card) => matchedIds.has(card.id))), [cards, matchedIds]);
   const displayedCards = visibleBundles.map((bundle) => {
@@ -59,19 +63,21 @@ export function Board({ cards, loading, onMove, onResize, onAddNote, selectedCar
 
   useEffect(() => {
     const newest = nodeBatches[0]?.id ?? null;
-    if (previousNewestBatch.current && newest && previousNewestBatch.current !== newest) {
+    if (view === "board" && previousNewestBatch.current && newest && previousNewestBatch.current !== newest) {
       const target = batchMarkers.find((batch) => batch.id === newest);
       window.requestAnimationFrame(() => scrollRef.current?.scrollTo({ top: Math.max(0, (target?.y ?? 0) - 82), behavior: "smooth" }));
     }
     previousNewestBatch.current = newest;
     setActiveBatchId((current) => current && batchMarkers.some((batch) => batch.id === current) ? current : batchMarkers[0]?.id ?? null);
-  }, [batchMarkers, nodeBatches]);
+  }, [batchMarkers, nodeBatches, view]);
 
   useEffect(() => {
-    if (!focusRequest || handledFocusRequest.current === focusRequest.requestId) return;
-    handledFocusRequest.current = focusRequest.requestId;
-    const target = cardNavigationTarget(cards, focusRequest.cardId);
+    const request = timelineFocus ?? focusRequest;
+    if (!request || handledFocusRequest.current === request.requestId) return;
+    handledFocusRequest.current = request.requestId;
+    const target = cardNavigationTarget(cards, request.cardId);
     if (!target) return;
+    setView("board");
     setFilter("all");
     setQuery("");
     setPackIndexes((current) => ({ ...current, [target.bundleId]: target.packIndex }));
@@ -92,7 +98,9 @@ export function Board({ cards, loading, onMove, onResize, onAddNote, selectedCar
         highlightTimer.current = window.setTimeout(() => setHighlightedCardId(null), 1_500);
       });
     });
-  }, [cards, focusRequest, onSelect]);
+  }, [cards, focusRequest, timelineFocus, onSelect]);
+
+  useEffect(() => { setTimelineFocus(null); }, [focusRequest]);
 
   useEffect(() => () => {
     if (highlightTimer.current !== null) window.clearTimeout(highlightTimer.current);
@@ -125,10 +133,15 @@ export function Board({ cards, loading, onMove, onResize, onAddNote, selectedCar
     <section ref={scrollRef} className="board-scroll relative flex-1 overflow-auto" aria-label="项目信息白板" onScroll={(event) => setActiveBatchId(activeUpdateBatch(batchMarkers, event.currentTarget.scrollTop + 110))} onMouseDown={(event) => event.target === event.currentTarget && onSelect(null)}>
       <div className="board-tools sticky top-4 z-30 ml-[90px] flex w-max items-center gap-2">
         <div className="board-filter flex items-center gap-0.5">
+          <button type="button" className={view === "board" ? "selected" : ""} aria-pressed={view === "board"} onClick={() => setView("board")}>{t("boardView")}</button>
+          <button type="button" className={view === "timeline" ? "selected" : ""} aria-pressed={view === "timeline"} onClick={() => setView("timeline")}>{t("timelineView")}</button>
+        </div>
+        <div className="board-filter flex items-center gap-0.5">
           {filters.map((item) => <button className={filter === item.value ? "selected" : ""} type="button" key={item.value} onClick={() => setFilter(item.value)}>{t(item.label)}</button>)}
         </div>
         <input className="board-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("searchCards")} aria-label={t("searchCards")} />
       </div>
+      {view === "timeline" ? (loading ? <div className="timeline-view"><div className="loading-mark" /></div> : <Timeline cards={cards.filter((card) => matchedIds.has(card.id))} onOpen={(cardId) => setTimelineFocus({ cardId, requestId: --timelineRequestId.current })} />) : <>
       {nodeBatches.length > 0 && (
         <div className="update-node-sticky" aria-hidden={false}>
           <nav className="update-node-rail" aria-label={t("updateNavigator")}>
@@ -201,6 +214,7 @@ export function Board({ cards, loading, onMove, onResize, onAddNote, selectedCar
           })
         )}
       </div>
+      </>}
     </section>
   );
 }

@@ -1,0 +1,91 @@
+/* Shared surfaces keep every card type consistent and follow OS appearance live. */
+:root {
+  color-scheme: light dark;
+  --background: #f1efe9;
+  --board-background: #efede7;
+  --surface: #fbfaf6;
+  --surface-secondary: #f7f5f0;
+  --surface-hover: #eeece5;
+  --text-primary: #252620;
+  --text-secondary: #5f605a;
+  --text-muted: #817f76;
+  --border: rgba(36, 37, 33, .13);
+  --dot: rgba(56, 57, 52, .13);
+  --accent: #d6533c;
+  --danger: #bf4937;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #191b19;
+    --board-background: #1d201d;
+    --surface: #292d29;
+    --surface-secondary: #232623;
+    --surface-hover: #343a34;
+    --text-primary: #eeeFEa;
+    --text-secondary: #bec3b9;
+    --text-muted: #949c90;
+    --border: rgba(222, 231, 217, .15);
+    --dot: rgba(198, 211, 190, .13);
+    --accent: #f2866e;
+    --danger: #f29685;
+  }
+}
+:root, .app-workspace { color: var(--text-primary); background: var(--background); }
+.theme-text-primary, .card-title { color: var(--text-primary); }
+.theme-text-secondary, .card-content { color: var(--text-secondary); }
+.theme-text-muted { color: var(--text-muted); }
+.workspace-header, .inspector { background: var(--surface-secondary); border-color: var(--border); }
+.board-scroll, .board-canvas { background-color: var(--board-background); }
+.board-canvas { background-image: radial-gradient(circle, var(--dot) 1px, transparent 1.15px); }
+.research-card { background: var(--surface); border-color: var(--border); }
+.research-card:hover { border-color: var(--text-muted); }
+.research-card.selected, .research-card.dragging, .research-card.resizing { border-color: var(--accent); }
+.research-card.type-event { border-top-color: var(--accent); }
+.research-card.change-updated { border-color: #bb802b; }
+.research-card.change-conflict { border-color: var(--danger); }
+.pack-sheet, .pack-sheet-mid { background: var(--surface-secondary); border-color: var(--border); }
+.card-image-frame { background: var(--surface-hover); }
+.card-kind, .card-summary-label, .card-menu, .card-focus-category, .source-link { color: var(--text-muted); }
+.card-focus-category, .source-link, .pack-navigation { border-color: var(--border); }
+.pack-navigation { background: var(--surface-secondary); color: var(--text-secondary); }
+.card-action-menu, .source-popover, .card-size-readout { background: var(--surface); border-color: var(--border); color: var(--text-secondary); }
+.card-action-menu button, .source-popover header, .source-popover > button { color: var(--text-secondary); }
+.source-popover > button small { color: var(--text-muted); }
+.card-action-menu button:hover, .pack-navigation button:hover { background: var(--surface-hover); color: var(--accent); }
+.board-filter, .board-search { background: var(--surface); border-color: var(--border); color: var(--text-secondary); }
+.board-filter button { color: var(--text-muted); }
+.board-filter button:hover { color: var(--text-primary); }
+.board-filter button.selected { background: var(--surface-hover); color: var(--accent); }
+.update-node { color: var(--text-muted); }
+.update-node:hover { background: var(--surface); color: var(--text-primary); }
+.update-node-dot { border-color: var(--board-background); }
+.update-node-copy small, .batch-marker, .batch-marker time { color: var(--text-muted); }
+.inspector-heading, .field-label, .preview-label { color: var(--text-muted); }
+.inspector-tag, .focus-tag, .candidate-row, .source-form, .task-run { background: var(--surface); border-color: var(--border); }
+.inspector-tag, .focus-tag, .task-run p, .change-summary { color: var(--text-secondary); }
+.task-run strong, .change-row strong, .empty-source strong, .setting-toggle strong { color: var(--text-primary); }
+.task-run small, .change-row small, .empty-source small, .setting-toggle small { color: var(--text-muted); }
+.compact-field, .compact-area, .text-field, .prompt-area, .create-dialog, .settings-dialog { background: var(--surface); border-color: var(--border); color: var(--text-primary); }
+.compact-field::placeholder, .compact-area::placeholder, .text-field::placeholder, .prompt-area::placeholder { color: var(--text-muted); }
+.secondary-button, .header-more, .small-icon-button { background: var(--surface); border-color: var(--border); color: var(--text-secondary); }
+.secondary-button:hover, .header-more:hover, .small-icon-button:hover, .source-row:hover, .mini-button:not(.primary):hover, .change-row-target:hover { background: var(--surface-hover); color: var(--text-primary); }
+.mini-button:not(.primary), .source-action, .source-remove, .dialog-close { color: var(--text-muted); }
+.data-folder-link { display: inline-flex; align-items: center; gap: 5px; border-radius: 4px; padding: 3px 5px; color: var(--accent); font-size: 10px; font-weight: 600; }
+.data-folder-link:hover { background: var(--surface-hover); text-decoration: underline; text-underline-offset: 3px; }
+.data-folder-link:disabled { cursor: wait; opacity: .65; }
+.data-folder-error { margin-top: 8px; color: var(--danger); font-size: 10px; line-height: 1.5; }
+@media (prefers-color-scheme: dark) {
+  .app-workspace .bg-white, .app-workspace [class*="bg-[#f"] { background-color: var(--surface); }
+  .app-workspace [class*="border-black"] { border-color: var(--border); }
+  .app-workspace [class~="text-[#bf4937]"], .card-action-menu button.danger { color: var(--danger); }
+  .app-workspace [class~="text-[#e15e45]"], .text-button, .discover-button { color: var(--accent); }
+  .status-badge, .verified-badge, .card-lock, .task-status { color: #a6c9ac; }
+  .task-status.partial, .change-badge.updated { color: #dfb777; }
+  .task-status.failed, .change-badge.conflict { color: var(--danger); }
+  .task-status.running { color: #adc8e7; }
+  .security-note strong, .api-hint strong { color: var(--text-secondary); }
+  .security-note p, .api-hint small { color: var(--text-muted); }
+  .empty-source, .source-type-switch { border-color: var(--border); color: var(--text-muted); }
+  .source-type-switch button.selected { background: var(--surface-hover); color: var(--text-primary); }
+  .menu-divider, .candidate-panel { border-color: var(--border); }
+}
