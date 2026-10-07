@@ -548,7 +548,7 @@ export class FeedService {
           .filter((item): item is CollectedInformation => Boolean(item));
         const sourceLinks = dedupeSourceLinks(evidence.map((item) => ({ name: item.sourceName, url: item.url })));
         const overview = synthesisOverview(decision, contentLanguage, decision.previewSummary);
-        const selectedImages = selectCardImages(evidence.flatMap((item) => item.images ?? []), overview);
+        const selectedImages = selectCardImages(evidence.flatMap((item) => item.images ?? []), overview, decision.coverage?.map(row => row.entity) ?? buildResearchWorkflow(project).entities);
         const imageUrl = selectedImages.imageUrl;
         const images = [...selectedImages.images];
         const identity = (url: string) => { const parsed = new URL(url); parsed.hash = ""; return parsed.toString(); };

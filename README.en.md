@@ -4,9 +4,9 @@
 
 [Download](https://github.com/Gm-sunsky/openresearch/releases/latest) · [Report an issue](https://github.com/Gm-sunsky/openresearch/issues)
 
-OpenResearch is a local-first AI research workspace for Windows and macOS. Describe a topic, discover sources, and organize evidence on a persistent research board. Current version: **1.5.4**.
+OpenResearch is a local-first AI research workspace for Windows and macOS. Describe a topic, discover sources, and organize evidence on a persistent research board. Current version: **1.5.5**.
 
-Version 1.5.4 adds caption-based core-image selection, independent overviews, a full-material reader, and fixes for draft resets and stale pointer listeners. See [release notes](docs/RELEASE_NOTES_V1_5_4.md).
+Version 1.5.5 adds caption-based core-image selection, independent overviews, a full-material reader, and fixes for draft resets and stale pointer listeners. See [release notes](docs/RELEASE_NOTES_V1_5_5.md).
 
 ## Features
 
@@ -25,10 +25,10 @@ Download packages from this repository's **Releases** page once published.
 
 | Platform | Package | Installation |
 | --- | --- | --- |
-| Windows 10/11 x64 | `OpenResearch Setup 1.5.4.exe` | Run the installer and choose a directory. |
-| Windows x64 portable | `OpenResearch Portable 1.5.4.zip` | Extract the entire archive and run `OpenResearch.exe`. |
-| macOS Apple Silicon | `OpenResearch macOS arm64 1.5.4.zip` | Extract and move `OpenResearch.app` to Applications. |
-| macOS Intel | `OpenResearch macOS x64 1.5.4.zip` | Extract and move `OpenResearch.app` to Applications. |
+| Windows 10/11 x64 | `OpenResearch Setup 1.5.5.exe` | Run the installer and choose a directory. |
+| Windows x64 portable | `OpenResearch Portable 1.5.5.zip` | Extract the entire archive and run `OpenResearch.exe`. |
+| macOS Apple Silicon | `OpenResearch macOS arm64 1.5.5.zip` | Extract and move `OpenResearch.app` to Applications. |
+| macOS Intel | `OpenResearch macOS x64 1.5.5.zip` | Extract and move `OpenResearch.app` to Applications. |
 | macOS native installer | `.dmg` for arm64 or x64 | Produced by the macOS GitHub Actions job; open and drag to Applications. |
 
 macOS requires macOS 11 or newer. These builds are unsigned and not notarized. Windows may show an unknown publisher notice. On macOS, follow the system's Privacy & Security instructions to open an unsigned app you trust. Do not disable system-wide security protections. Native macOS launch testing must be performed on a Mac; archive verification on Windows does not establish runtime compatibility.
@@ -73,11 +73,11 @@ npm run dist:mac           # macOS: DMG and ZIP, arm64 and x64
 npm run dist:mac:portable  # Windows + Python 3: macOS portable ZIPs
 ```
 
-Windows and cross-built Mac portable packages are placed in `release/V1.5.4/`. Native macOS builds are placed in `release/`. Windows packaging also requires access to electron-builder's tooling downloads; macOS portable packaging downloads the matching Electron runtimes when absent from the cache.
+Windows and cross-built Mac portable packages are placed in `release/V1.5.5/`. Native macOS builds are placed in `release/`. Windows packaging also requires access to electron-builder's tooling downloads; macOS portable packaging downloads the matching Electron runtimes when absent from the cache.
 
 ## GitHub builds and releases
 
-`.github/workflows/release.yml` runs lint, type checks, tests, and platform builds on Windows and macOS. Run it manually to obtain build artifacts, or push a version tag matching `package.json` (for example, `v1.5.4`) to publish a Release after both builds succeed. GitHub Actions must be enabled; account usage limits apply. Signing/notarization credentials are not configured.
+`.github/workflows/release.yml` runs lint, type checks, tests, and platform builds on Windows and macOS. Run it manually to obtain build artifacts, or push a version tag matching `package.json` (for example, `v1.5.5`) to publish a Release after both builds succeed. GitHub Actions must be enabled; account usage limits apply. Signing/notarization credentials are not configured.
 
 ## Architecture
 

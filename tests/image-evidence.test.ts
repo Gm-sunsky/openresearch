@@ -72,3 +72,17 @@ it("uses a real lazy-loaded image instead of its tracking placeholder", () => {
   expect(images).toHaveLength(1);
   expect(images[0]).toMatchObject({ url: "https://example.com/actual.jpg", caption: "Falcon rocket launch confirmed" });
 });
+
+
+it("does not confuse an entity name or publisher label with core-fact evidence", () => {
+  const entity = "中华人民共和国文化和旅游部";
+  expect(imageRelevanceScore(entity, `${entity}发布新的旅游政策。`, [entity])).toBe(0);
+  expect(imageRelevanceScore("New York Times", "New York Times publishes new reporting.")).toBe(0);
+  expect(imageRelevanceScore("独库公路历史风景照片", "独库公路恢复开放，车辆允许通行。")).toBe(0);
+});
+
+it("keeps dated pictures unverified when their year does not match core facts", () => {
+  expect(imageRelevanceScore("Falcon rocket launch in 2025", "Falcon rocket launch confirmed in 2026.")).toBe(0);
+  expect(imageRelevanceScore("Falcon rocket launch in 2025", "Falcon rocket launch confirmed.")).toBe(0);
+  expect(imageRelevanceScore("Falcon rocket launch in 2026", "Falcon rocket launch confirmed in 2026.")).toBeGreaterThan(0);
+});

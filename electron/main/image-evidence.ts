@@ -72,13 +72,18 @@ export function imagesFromHtml(html: string, sourceUrl: string): CardImage[] {
 }
 
 const GENERIC_WORDS = new Set("image photo picture photograph screenshot illustration latest official update news source article related background banner cover figure shows showing this that with from have has been were will their there about after before information announcement stock credit courtesy press release january february march april may june july august september october november december monday tuesday wednesday thursday friday saturday sunday today yesterday tomorrow".split(" "));
-const ACTION_GROUPS = [ /发射|升空|点火|launch|liftoff/i, /着陆|回收|landing|recovery/i, /开放|开通|open/i, /封闭|关闭|closed|closure/i, /售票|开票|ticket|presale/i, /公演|演唱会|巡演|concert|tour/i, /延期|推迟|delay|postpone/i, /取消|cancel/i, /播出|放送|premiere|broadcast/i, /发布|推出|release|unveil/i ];
+const ACTION_GROUPS = [ /发射|升空|点火|launch|liftoff/i, /着陆|回收|landing|recovery/i, /开放|开通|open/i, /封闭|关闭|closed|closure/i, /售票|开票|ticket|presale/i, /公演|演唱会|巡演|concert|tour/i, /延期|推迟|delay|postpone/i, /取消|cancel/i, /播出|放送|premiere|broadcast/i, /发布|推出|release|unveil/i, /时间|日期|日程|赛程|时刻|\b(?:date|time|schedule|calendar|timetable)\b/i, /票价|价格|费用|\b(?:price|fare|cost)\b/i, /地点|地址|场地|路线|\b(?:location|address|venue|route|map)\b/i ];
 
 /** Conservative text evidence only; a source title alone is never an image caption. */
-export function imageRelevanceScore(caption: string | null, coreFacts: string): number {
+export function imageRelevanceScore(caption: string | null, coreFacts: string, entities: string[] = []): number {
   if (!caption || /^(?:图片|照片|配图|封面|示意图|资料图|图\s*\d*|image|photo|picture|screenshot|illustration|stock photo)(?:\s*\d*)?$/i.test(caption.trim())) return 0;
+  const identity = (value: string) => value.toLowerCase().replace(/官方|配图|图片|照片|头像|海报|封面|标志|徽标/g, "").replace(/\b(?:official|image|photo|picture|logo|poster|banner)\b/g, "").replace(/[\s\p{Punctuation}]/gu, "");
+  if (entities.some(entity => identity(entity) && identity(entity) === identity(caption))) return 0;
   const lower = caption.slice(0, 4000).toLowerCase();
   const facts = coreFacts.toLowerCase();
+  const captionYears = lower.match(/\b(?:19|20)\d{2}\b/g) ?? [];
+  const factYears = new Set(facts.match(/\b(?:19|20)\d{2}\b/g) ?? []);
+  if (captionYears.some(year => !factYears.has(year))) return 0;
   const words = [...new Set(lower.match(/[a-z][a-z0-9-]{2,}/g) ?? [])].filter((word) => !GENERIC_WORDS.has(word));
   const hits = words.filter((word) => new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(facts));
   let chineseLength = 0;
@@ -88,12 +93,12 @@ export function imageRelevanceScore(caption: string | null, coreFacts: string): 
     }
   }
   const sameAction = ACTION_GROUPS.some((pattern) => pattern.test(lower) && pattern.test(facts));
-  if ((hits.length >= 2 && (sameAction || hits.length >= 3)) || (chineseLength >= 4 && sameAction) || chineseLength >= 8) return hits.length * 2 + chineseLength + (sameAction ? 4 : 0);
+  if (sameAction && (hits.length >= 2 || chineseLength >= 4)) return hits.length * 2 + chineseLength + (sameAction ? 4 : 0);
   return 0;
 }
 
-export function selectCardImages(candidates: CardImage[], coreFacts: string): { images: CardImage[]; imageUrl: string | null } {
-  const ranked = dedupeImages(candidates).map((image, index) => ({ image, index, score: imageRelevanceScore(image.caption, coreFacts) }))
+export function selectCardImages(candidates: CardImage[], coreFacts: string, entities: string[] = []): { images: CardImage[]; imageUrl: string | null } {
+  const ranked = dedupeImages(candidates).map((image, index) => ({ image, index, score: imageRelevanceScore(image.caption, coreFacts, entities) }))
     .sort((left, right) => right.score - left.score || left.index - right.index);
   return {
     images: ranked.map(({ image, score }) => ({ ...image, relevance: score > 0 ? "relevant" : "unverified" })),
