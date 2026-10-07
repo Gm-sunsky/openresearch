@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
-import type { ApiConnectionResult, Card, CardType, CreateProjectInput, InformationChangeKind, Project, ProjectDraft, SaveAiSettingsInput, Source } from "../../src/shared/contracts";
-import { informationDepthPolicy } from "../../src/shared/information-depth";
+import type { ApiConnectionResult, Card, CardImage, CardType, CreateProjectInput, InformationChangeKind, Project, ProjectDraft, SaveAiSettingsInput, Source } from "../../src/shared/contracts";
+import { synthesisOverview } from "../../src/shared/synthesis-preview";
+import { dedupeImages, safeImage } from "./image-evidence";
 import { inferSourcePlatform } from "../../src/shared/source-platform";
 import { ApiSettingsService, type RuntimeAiSettings } from "./api-settings";
 import { resolveContentLanguage } from "./information-memory";
-import { buildResearchWorkflow, classifyEvidenceTier, limitResearchText, researchDepthPrompt, platformSearchHint, workflowPromptContext, type EvidenceTier } from "./research-workflow";
+import { buildResearchWorkflow, classifyEvidenceTier, researchDepthPrompt, platformSearchHint, workflowPromptContext, type EvidenceTier } from "./research-workflow";
 import { compileResearchSkillContext, loadResearchSkill, type ResearchSkill } from "./research-skill";
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
@@ -28,6 +29,7 @@ export interface InformationItemInput {
   url: string;
   sourceName?: string;
   imageUrl?: string | null;
+  images?: CardImage[];
   evidenceTier?: EvidenceTier;
   researchEntity?: string;
   researchTask?: string;
@@ -48,6 +50,7 @@ export interface OrganizedInformation {
 }
 
 export interface SynthesizedInformation extends Omit<OrganizedInformation, "index" | "relevant"> {
+  previewSummary?: string;
   focusCategory: string;
   sourceIndexes: number[];
   coverage: Array<{
@@ -125,8 +128,18 @@ const SEARCHED_SOURCE_UPDATES_FORMAT = {
             url: { type: "string" },
             published_at: { type: ["string", "null"] },
             image_url: { type: ["string", "null"] },
+            image_caption: { type: ["string", "null"] },
+            images: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: { url: { type: "string" }, caption: { type: ["string", "null"] }, source_url: { type: "string" } },
+                required: ["url", "caption", "source_url"],
+                additionalProperties: false,
+              },
+            },
           },
-          required: ["source_index", "title", "summary", "url", "published_at", "image_url"],
+          required: ["source_index", "title", "summary", "url", "published_at", "image_url", "image_caption", "images"],
           additionalProperties: false,
         },
       },
@@ -156,9 +169,19 @@ const RESEARCH_WORKFLOW_RESULTS_FORMAT = {
             url: { type: "string" },
             published_at: { type: ["string", "null"] },
             image_url: { type: ["string", "null"] },
+            image_caption: { type: ["string", "null"] },
+            images: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: { url: { type: "string" }, caption: { type: ["string", "null"] }, source_url: { type: "string" } },
+                required: ["url", "caption", "source_url"],
+                additionalProperties: false,
+              },
+            },
             evidence_tier: { type: "string", enum: ["primary", "operator", "specialist", "community"] },
           },
-          required: ["entity", "task", "title", "summary", "source_name", "url", "published_at", "image_url", "evidence_tier"],
+          required: ["entity", "task", "title", "summary", "source_name", "url", "published_at", "image_url", "image_caption", "images", "evidence_tier"],
           additionalProperties: false,
         },
       },
@@ -252,13 +275,14 @@ const SYNTHESIZED_INFORMATION_FORMAT = {
             type: { type: "string", enum: ["news", "event", "timeline", "analysis"] },
             title: { type: "string" },
             summary: { type: "string" },
+            preview_summary: { type: "string" },
             importance: { type: "integer", minimum: 1, maximum: 3 },
             occurred_at: { type: ["string", "null"] },
             change_kind: { type: "string", enum: ["none", "updated", "conflict"] },
             previous_card_id: { type: ["string", "null"] },
             change_summary: { type: ["string", "null"] },
           },
-          required: ["focus_category", "source_indexes", "coverage", "as_of", "confidence", "type", "title", "summary", "importance", "occurred_at", "change_kind", "previous_card_id", "change_summary"],
+          required: ["focus_category", "source_indexes", "coverage", "as_of", "confidence", "type", "title", "summary", "preview_summary", "importance", "occurred_at", "change_kind", "previous_card_id", "change_summary"],
           additionalProperties: false,
         },
       },
@@ -395,6 +419,27 @@ export function parseSynthesisText(text: string): Record<string, unknown> {
   throw new Error("AI 返回内容不是可恢复的卡片 JSON");
 }
 
+function fullText(value: unknown, fallback: string): string {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+/** Captions come from image-specific source text; uncaptained images remain unverified. */
+function searchedImages(item: Record<string, unknown>, sourceUrl: string): CardImage[] {
+  const image = typeof item.image_url === "string"
+    ? safeImage(item.image_url, typeof item.image_caption === "string" ? item.image_caption : null, sourceUrl)
+    : null;
+  const extra = Array.isArray(item.images) ? item.images.flatMap((value): CardImage[] => {
+    if (!value || typeof value !== "object") return [];
+    const row = value as Record<string, unknown>;
+    // Do not assign the result page as provenance to unrelated media metadata.
+    const provenance = row.sourceUrl ?? row.source_url;
+    if (provenance !== sourceUrl || typeof row.url !== "string") return [];
+    const safe = safeImage(row.url, typeof row.caption === "string" ? row.caption : null, sourceUrl);
+    return safe ? [safe] : [];
+  }) : [];
+  return dedupeImages([...(image ? [image] : []), ...extra]);
+}
+
 function textField(value: unknown, fallback: string, maxLength: number): string {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, maxLength) : fallback;
 }
@@ -481,7 +526,6 @@ function normalizeSkillSynthesis(
   const rawCards = Array.isArray(parsed.cards) ? parsed.cards.filter((card): card is Record<string, unknown> => Boolean(card) && typeof card === "object") : [];
   const itemByIndex = new Map(items.map((item) => [item.index, item]));
   const allowedTypes = new Set<SynthesizedInformation["type"]>(["news", "event", "timeline", "analysis"]);
-  const policy = informationDepthPolicy(project.informationDepth);
 
   return workflow.tasks.map((focusCategory): SynthesizedInformation => {
     const rawCard = rawCards.find((card) => normalizedMatch(recordField(card, "focus_category", "focusCategory"), workflow.tasks) === focusCategory) ?? {};
@@ -489,9 +533,6 @@ function normalizeSkillSynthesis(
     const rawCoverage = Array.isArray(rawCard.coverage)
       ? rawCard.coverage.filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object")
       : [];
-    const labelCharacters = workflow.entities.reduce((sum, entity) => sum + entity.length + 4, 0);
-    const perEntityCharacters = Math.max(20, Math.floor((policy.maxCharacters - labelCharacters) / workflow.entities.length));
-    const perEntityFacts = Math.max(1, Math.floor(policy.maxFacts / workflow.entities.length));
     const coverage: SynthesizedInformation["coverage"] = workflow.entities.map((entity) => {
       const row = rawCoverage.find((candidate) => normalizedMatch(candidate.entity, workflow.entities) === entity);
       const eligibleItems = items.filter((item) => evidenceForCell(item, entity, focusCategory, workflow.entities));
@@ -512,7 +553,7 @@ function normalizeSkillSynthesis(
       return {
         entity,
         status,
-        statement: caveat + limitResearchText(statement, project.informationDepth, Math.max(1, perEntityCharacters - caveat.length), perEntityFacts, focusCategory),
+        statement: caveat + statement.trim(),
         sourceIndexes,
       };
     });
@@ -537,6 +578,11 @@ function normalizeSkillSynthesis(
       type,
       title: sourceIndexes.length ? textField(rawCard.title, focusCategory, 160) : focusCategory,
       summary,
+      previewSummary: synthesisOverview({ coverage, summary }, outputLanguage,
+        rawCoverage.length === coverage.length && coverage.every((row) => {
+          const raw = rawCoverage.find((candidate) => normalizedMatch(candidate.entity, workflow.entities) === row.entity);
+          return raw?.status === row.status && JSON.stringify(validSourceIndexes(recordField(raw, "source_indexes", "sourceIndexes"), validIndexes)) === JSON.stringify(row.sourceIndexes);
+        }) ? recordField(rawCard, "preview_summary", "previewSummary") : undefined),
       importance: Math.max(1, Math.min(3, typeof rawCard.importance === "number" ? Math.trunc(rawCard.importance) : 2)),
       occurredAt: typeof recordField(rawCard, "occurred_at", "occurredAt") === "string" && String(recordField(rawCard, "occurred_at", "occurredAt")).trim() ? String(recordField(rawCard, "occurred_at", "occurredAt")).trim().slice(0, 80) : null,
       changeKind: recordField(rawCard, "change_kind", "changeKind") === "updated" || recordField(rawCard, "change_kind", "changeKind") === "conflict" ? recordField(rawCard, "change_kind", "changeKind") as "updated" | "conflict" : "none",
@@ -969,7 +1015,7 @@ export class AiApiClient {
         relevant: item.relevant !== false,
         type,
         title: textField(item.title, boundedItems.find((candidate) => candidate.index === index)?.title ?? "新信息", 160),
-        summary: limitResearchText(textField(item.summary, "该条信息暂无摘要，请打开原文查看。", 10_000), project.informationDepth, undefined, undefined, project.focus.join(" ")),
+        summary: fullText(item.summary, "该条信息暂无摘要，请打开原文查看。"),
         importance: Math.max(1, Math.min(3, typeof item.importance === "number" ? Math.trunc(item.importance) : 2)),
         occurredAt: typeof item.occurred_at === "string" && item.occurred_at.trim() ? item.occurred_at.trim().slice(0, 80) : null,
         changeKind: item.change_kind === "updated" || item.change_kind === "conflict" ? item.change_kind : "none",
@@ -1018,6 +1064,7 @@ export class AiApiClient {
       "First identify every fact related to a focus category across ALL COLLECTED INFORMATION. Return exactly one synthesized card for every supplied focus category, in the supplied order. Include exactly one coverage row for every monitored entity. Use no_evidence only with a specific coverage explanation.",
       "Do not create one card per article or source. Combine corroborating facts, reconcile dates and statuses, state uncertainty, and explicitly note material disagreement. The result must be secondary information: a concise cross-source conclusion rather than copied excerpts.",
       "Every focus_category must exactly match one supplied project focus category. Every source_indexes array must include all and only the collected item indexes actually used to support that card, with no duplicates.",
+      "Write a separate preview_summary of at most 160 characters for the card face: synthesize the core conclusion across all monitored entities, explicitly include conflicts or missing evidence, and do not copy the opening of summary. Full summary and coverage statements are preserved for the reader.",
       "Write concise per-entity bullet lines within the information depth budget. Put current status, effective date, place, deadline, price, restrictions, and confirmed changes first when present. Never invent facts.",
       `Keep focus_category exactly equal to a supplied focus category. Write every title, summary, and change_summary in this output language: ${outputLanguage}.`,
       "Compare each synthesized conclusion with SAVED INFORMATION. Use updated for a material change, conflict for contradictory claims between current sources or against saved information, otherwise none. Reference only a supplied saved card ID when the conflict involves saved information.",
@@ -1166,6 +1213,7 @@ export class AiApiClient {
       "Work through every entity-task cell in RESEARCH WORKFLOW. Do not replace named entities with the umbrella project topic and do not let one well-covered entity hide the others.",
       `For each cell, first return core evidence, then up to ${workflow.depthPolicy.relationHops} related evidence items from relatedQueries when supported. Keep every item tagged with its original entity and task. Complete all core cells before expanding any one cell. Prefer primary and operator sources, then specialist sources. Community evidence may fill a gap only when marked community.`,
       "Each item must state a concrete fact that directly answers its task. Preserve the original article, announcement, episode, schedule, post, or video URL; never return a generic search-results URL or invent a URL.",
+      "For images, image_caption must quote the actual source image alt text, figcaption, or media title. Never use the article title, article summary, inferred description, or your own paraphrase as a caption. Return null when no image-specific description is available. image_url must be a real image found on the cited result page; never invent provenance. Additional images may be returned in images; source_url must be the exact cited result URL on which that image and caption were found. Return an empty images array if unavailable.",
       "Omit cells with no usable evidence. Never create placeholder items such as 'no information available'. The later coverage audit handles missing cells.",
       "Dates, status changes, cancellations, prices, schedules, and staff credits must be attributed to the page that supports them. Separate confirmed facts from inference.",
       `Write title and summary in this output language: ${outputLanguage}. Keep entity and task exactly equal to values from the research workflow.`,
@@ -1256,7 +1304,7 @@ export class AiApiClient {
       seen.add(dedupeKey);
       const inferredTier = classifyEvidenceTier({ name: String(item.source_name ?? ""), url: url.toString(), platform: inferSourcePlatform(url.toString()) });
       const tier = inferredTier === "community" ? "community" : evidenceTiers.has(item.evidence_tier as EvidenceTier) ? item.evidence_tier as EvidenceTier : inferredTier;
-      const content = limitResearchText(textField(item.summary, "", 10_000), project.informationDepth, undefined, undefined, task);
+      const content = fullText(item.summary, "");
       if (!content) return [];
       const imageUrl = typeof item.image_url === "string" && /^https?:\/\//i.test(item.image_url) ? item.image_url : null;
       return [{
@@ -1268,6 +1316,7 @@ export class AiApiClient {
         sourceName: textField(item.source_name, url.hostname, 160),
         url: url.toString(),
         imageUrl,
+        images: searchedImages(item, url.toString()),
         evidenceTier: tier,
         publishedAt: typeof item.published_at === "string" && item.published_at.trim() ? item.published_at.trim().slice(0, 80) : null,
       }];
@@ -1305,6 +1354,7 @@ export class AiApiClient {
       "RESEARCH WORKFLOW:",
       workflowPromptContext(project),
       "MONITORED SOURCES:",
+      "For images, image_caption must quote actual image alt text, figcaption, or media title from the cited page; never substitute article title, summary, or guessed descriptions. Return null without real image-specific text. Only image URLs actually found on the cited result page are allowed. Additional images may be returned in images, each source_url exactly equal to its cited result URL; use an empty array if unavailable.",
       JSON.stringify(monitoredSources),
     ].join("\n");
     const requestBody = {
@@ -1359,9 +1409,10 @@ export class AiApiClient {
         sourceIndex,
         sourceName: source.name,
         title: textField(item.title, source.name, 300),
-        content: textField(item.summary, "No readable summary was returned for this result.", 2_000),
+        content: fullText(item.summary, "No readable summary was returned for this result."),
         url,
         imageUrl,
+        images: searchedImages(item, url),
         publishedAt: typeof item.published_at === "string" && item.published_at.trim() ? item.published_at.trim().slice(0, 80) : null,
       }];
     });

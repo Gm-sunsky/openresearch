@@ -1,7 +1,9 @@
 import { informationDepthPolicy } from "../../src/shared/information-depth";
 import { mapConcurrent } from "./concurrency";
 import { XMLParser } from "fast-xml-parser";
-import type { AppLanguage, Card, CardSourceLink, CardType, CreateCardInput, Project, Source, UpdateRunResult } from "../../src/shared/contracts";
+import type { AppLanguage, Card, CardImage, CardSourceLink, CardType, CreateCardInput, Project, Source, UpdateRunResult } from "../../src/shared/contracts";
+import { synthesisOverview } from "../../src/shared/synthesis-preview";
+import { dedupeImages, imagesFromHtml, safeImage, selectCardImages } from "./image-evidence";
 import { AiApiClient, type InformationItemInput, type OrganizedInformation, type SynthesizedInformation } from "./ai-client";
 import { hashContent, ResearchDatabase } from "./database";
 import { detectInformationChange, resolveContentLanguage } from "./information-memory";
@@ -12,6 +14,7 @@ export interface FeedItem {
   link: string;
   summary: string;
   imageUrl: string | null;
+  images?: CardImage[];
   publishedAt: string | null;
 }
 
@@ -19,11 +22,13 @@ export interface PageDetails {
   title: string;
   description: string;
   imageUrl: string | null;
+  images?: CardImage[];
 }
 
 interface CollectedInformation extends InformationItemInput {
   sourceName: string;
   imageUrl: string | null;
+  images?: CardImage[];
   suggestedType: Extract<CardType, "news" | "event" | "timeline" | "analysis">;
   suggestedImportance: number;
 }
@@ -72,30 +77,22 @@ function objectAttribute(value: unknown, attribute: string): string {
   return typeof field === "string" || typeof field === "number" ? String(field).trim() : "";
 }
 
-function imageFromMarkup(value: string): string {
-  for (const tag of value.match(/<img\b[^>]*>/gi) ?? []) {
-    const src = tag.match(/\bsrc=["']([^"']+)["']/i)?.[1]?.trim() ?? "";
-    const hint = `${src} ${tag.match(/\b(?:alt|class|id)=["']([^"']*)["']/i)?.[1] ?? ""}`;
-    const width = Number(tag.match(/\bwidth=["']?(\d+)/i)?.[1] ?? 0);
-    const height = Number(tag.match(/\bheight=["']?(\d+)/i)?.[1] ?? 0);
-    if (!src || /logo|icon|avatar|emoji|spacer|tracking|pixel/i.test(hint)) continue;
-    if ((width > 0 && width < 120) || (height > 0 && height < 80)) continue;
-    return src;
+function feedImages(record: Record<string, unknown>, rawContent: string, sourceUrl: string): CardImage[] {
+  const images: CardImage[] = [];
+  const groups = toArray<Record<string, unknown>>(record["media:group"] as Record<string, unknown> | undefined);
+  for (const scope of [record, ...groups]) {
+    for (const key of ["media:content", "media:thumbnail", "enclosure"]) {
+      for (const media of toArray<Record<string, unknown>>(scope[key] as Record<string, unknown> | undefined)) {
+        const type = objectAttribute(media, "type");
+        if ((key === "enclosure" && !/^image\//i.test(type)) || (type && !/^image\//i.test(type))) continue;
+        const caption = textValue((media as Record<string, unknown>)["media:description"]) || textValue((media as Record<string, unknown>)["media:title"])
+          || textValue(scope["media:description"]) || textValue(scope["media:title"]) || null;
+        const image = safeImage(objectAttribute(media, "url"), caption, sourceUrl);
+        if (image) images.push(image);
+      }
+    }
   }
-  return "";
-}
-
-function feedImage(record: Record<string, unknown>, rawContent: string): string | null {
-  const mediaContent = toArray(record["media:content"] as Record<string, unknown> | undefined)
-    .find((item) => /^image\//i.test(objectAttribute(item, "type")) || Boolean(objectAttribute(item, "url")));
-  const mediaThumbnail = toArray(record["media:thumbnail"] as Record<string, unknown> | undefined)[0];
-  const enclosure = toArray(record.enclosure as Record<string, unknown> | undefined)
-    .find((item) => /^image\//i.test(objectAttribute(item, "type")));
-  return objectAttribute(mediaContent, "url")
-    || objectAttribute(mediaThumbnail, "url")
-    || objectAttribute(enclosure, "url")
-    || imageFromMarkup(rawContent)
-    || null;
+  return dedupeImages([...images, ...imagesFromHtml(rawContent, sourceUrl)]);
 }
 
 export function parseFeed(xml: string): FeedItem[] {
@@ -108,11 +105,13 @@ export function parseFeed(xml: string): FeedItem[] {
     return toArray(channel.item as Record<string, unknown> | Array<Record<string, unknown>> | undefined)
       .map((item) => {
         const rawContent = textValue(item["content:encoded"]) || textValue(item.description);
+        const images = feedImages(item, rawContent, textValue(item.link).trim() || textValue(item.guid).trim());
         return {
           title: textValue(item.title).trim(),
           link: textValue(item.link).trim() || textValue(item.guid).trim(),
           summary: stripMarkup(rawContent).slice(0, 12_000),
-          imageUrl: feedImage(item, rawContent),
+          imageUrl: images[0]?.url ?? null,
+          images,
           publishedAt: textValue(item.pubDate).trim() || null,
         };
       })
@@ -130,11 +129,13 @@ export function parseFeed(xml: string): FeedItem[] {
         && (link as Record<string, unknown>).rel === "alternate"
       )) ?? links[0];
       const rawContent = textValue(entry.content) || textValue(entry.summary);
+      const images = feedImages(entry, rawContent, textValue(alternate).trim() || textValue(entry.id).trim());
       return {
         title: textValue(entry.title).trim(),
         link: textValue(alternate).trim() || textValue(entry.id).trim(),
         summary: stripMarkup(rawContent).slice(0, 12_000),
-        imageUrl: feedImage(entry, rawContent),
+        imageUrl: images[0]?.url ?? null,
+        images,
         publishedAt: textValue(entry.published || entry.updated).trim() || null,
       };
     })
@@ -171,14 +172,12 @@ function resolveHttpUrl(candidate: string | null | undefined, baseUrl: string): 
 
 export function extractPageDetails(html: string, url: string, fallbackTitle = "网页更新"): PageDetails {
   const description = metaValue(html, ["description", "og:description", "twitter:description"]);
-  const socialImage = metaValue(html, ["og:image", "og:image:url", "twitter:image", "twitter:image:src"]);
-  const imageLink = (html.match(/<link\b[^>]*\brel=["']image_src["'][^>]*>/i)?.[0]
-    ?? html.match(/<link\b[^>]*\bhref=["'][^"']+["'][^>]*\brel=["']image_src["'][^>]*>/i)?.[0]);
-  const fallbackImage = imageFromMarkup(html);
+  const images = imagesFromHtml(html, url);
   return {
     title: titleFromHtml(html, fallbackTitle),
     description: compact([description, html].filter(Boolean).join(" "), 12_000),
-    imageUrl: resolveHttpUrl(socialImage || (imageLink ? tagAttribute(imageLink, "href") : "") || fallbackImage, url),
+    imageUrl: images[0]?.url ?? null,
+    images,
   };
 }
 
@@ -485,6 +484,7 @@ export class FeedService {
               index: 0,
               sourceName: source.name,
               imageUrl: item.imageUrl ?? null,
+              images: dedupeImages([...(item.images ?? []), ...(item.imageUrl ? [safeImage(item.imageUrl, null, item.url)].filter((image): image is CardImage => Boolean(image)) : [])]),
               evidenceTier: classifyEvidenceTier(source),
               suggestedType: inferCardType(item.title),
               suggestedImportance: inferImportance(item.title),
@@ -517,6 +517,7 @@ export class FeedService {
             ...item,
             sourceName: item.sourceName || new URL(item.url).hostname,
             imageUrl: item.imageUrl ?? null,
+              images: dedupeImages([...(item.images ?? []), ...(item.imageUrl ? [safeImage(item.imageUrl, null, item.url)].filter((image): image is CardImage => Boolean(image)) : [])]),
             suggestedType: inferCardType(item.researchTask + " " + item.title),
             suggestedImportance: item.evidenceTier === "primary" || item.evidenceTier === "operator" ? 3 : 2,
           }));
@@ -546,7 +547,21 @@ export class FeedService {
           .map((itemIndex) => collected.find((item) => item.index === itemIndex))
           .filter((item): item is CollectedInformation => Boolean(item));
         const sourceLinks = dedupeSourceLinks(evidence.map((item) => ({ name: item.sourceName, url: item.url })));
-        const imageUrl = evidence.find((item) => item.imageUrl)?.imageUrl ?? null;
+        const overview = synthesisOverview(decision, contentLanguage, decision.previewSummary);
+        const selectedImages = selectCardImages(evidence.flatMap((item) => item.images ?? []), overview);
+        const imageUrl = selectedImages.imageUrl;
+        const images = [...selectedImages.images];
+        const identity = (url: string) => { const parsed = new URL(url); parsed.hash = ""; return parsed.toString(); };
+        const savedImageUrls = new Set(images.map(image => identity(image.url)));
+        // Keep collected pictures from material not adopted as core evidence, without
+        // allowing those supplementary pictures to become a confirmed card preview.
+        const supplementary = dedupeImages(collected.filter(item => !item.researchTask || item.researchTask === decision.focusCategory).flatMap(item => item.images ?? []));
+        for (const image of supplementary) {
+          const key = identity(image.url);
+          if (savedImageUrls.has(key)) continue;
+          savedImageUrls.add(key);
+          images.push({ ...image, relevance: "unverified" });
+        }
         const fingerprint = hashContent(JSON.stringify({
           batch: runId,
           focus: decision.focusCategory,
@@ -558,6 +573,8 @@ export class FeedService {
           type: decision.type,
           title: decision.title,
           content: renderSynthesizedContent(decision, contentLanguage),
+          summary: overview,
+          images,
           imageUrl,
           sourceUrl: sourceLinks[0]?.url ?? null,
           sourceName: sourceLinks.length === 0 ? null : sourceLinks.length === 1 ? sourceLinks[0].name : `${sourceLinks.length} 个来源`,
@@ -629,6 +646,7 @@ export class FeedService {
         url: item.link,
         sourceName: source.name,
         imageUrl: resolveHttpUrl(item.imageUrl, item.link),
+        images: item.images ?? [],
         evidenceTier: classifyEvidenceTier(source),
         publishedAt: item.publishedAt,
         suggestedType: inferCardType(item.title),
@@ -643,6 +661,7 @@ export class FeedService {
         url: source.url,
         sourceName: source.name,
         imageUrl: details.imageUrl,
+        images: details.images ?? [],
         evidenceTier: classifyEvidenceTier(source),
         publishedAt: null,
         suggestedType: "news",

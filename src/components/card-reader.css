@@ -1,0 +1,22 @@
+.card-reader-backdrop { position: fixed; inset: 0; z-index: 150; display: flex; align-items: center; justify-content: center; padding: 30px; background: rgb(0 0 0 / 45%); backdrop-filter: blur(5px); }
+.card-reader { width: min(920px, 100%); height: min(860px, calc(100vh - 60px)); display: flex; flex-direction: column; border: 1px solid var(--border, #ccc); border-radius: 16px; color: var(--text-primary, #30312e); background: var(--surface, #fafaf7); box-shadow: 0 24px 90px rgb(0 0 0 / 30%); overflow: hidden; }
+.card-reader-toolbar { display: flex; align-items: center; gap: 20px; padding: 14px 22px; border-bottom: 1px solid var(--border, #ddd); font-size: 13px; }
+.card-reader-toolbar > span { flex: 1; }
+.card-reader-toolbar nav { display: flex; align-items: center; gap: 12px; }
+.card-reader button { border: 1px solid var(--border, #ccc); border-radius: 6px; padding: 5px 12px; background: transparent; color: inherit; cursor: pointer; }
+.card-reader button:disabled { opacity: .35; cursor: default; }
+.card-reader :focus-visible { outline: 2px solid #e15e45; outline-offset: 3px; }
+.card-reader-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 36px 58px; }
+.card-reader h1 { font-size: 26px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.card-reader-meta { opacity: .6; font-size: 12px; margin: 12px 0 28px; }
+.card-reader-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.95; font-size: 15px; user-select: text; }
+.card-reader h2 { font-size: 16px; font-weight: 600; margin: 32px 0 16px; }
+.card-reader figure { margin: 20px 0; }
+.card-reader figure img { display: block; max-width: 100%; max-height: 640px; object-fit: contain; margin: auto; border-radius: 8px; }
+.card-reader figcaption { font-size: 12px; line-height: 1.7; padding: 12px 0; }
+.card-reader figcaption button { display: block; margin-top: 8px; }
+.card-reader-unverified { display: block; opacity: .65; }
+.card-reader-sources { display: flex; flex-direction: column; gap: 8px; align-items: start; }
+.card-reader-sources button { text-align: left; overflow-wrap: anywhere; max-width: 100%; }
+.card-reader-hint { font-size: 11px; opacity: .65; padding: 10px 22px; border-top: 1px solid var(--border, #ddd); }
+@media (max-width: 700px) { .card-reader-backdrop { padding: 12px; } .card-reader { height: calc(100vh - 24px); } .card-reader-scroll { padding: 24px; } }

@@ -819,10 +819,7 @@ describe("research depth and evidence boundaries", () => {
     expect(result).toHaveLength(1);
     expect(result[0].content).toContain("8月24日22时播出");
     expect(result[0].content.length).toBeLessThanOrEqual(characters);
-    if (depth === "focused") expect(result[0].content).not.toMatch(/因为|见面会/);
-    else expect(result[0].content).toContain("因为官方公布的特别节目");
-    if (depth === "deep") expect(result[0].content).toContain("关联事项介绍");
-    else expect(result[0].content).not.toContain("关联事项介绍");
+    expect(result[0].content).toBe(detail); // Generation budget is a prompt policy, never an output deletion policy.
   });
 
   for (const mode of ["format", "compliance"] as const) {
@@ -848,13 +845,58 @@ describe("research depth and evidence boundaries", () => {
       expect(result[0].summary.length).toBeLessThanOrEqual(characters);
       for (const row of result[0].coverage) {
         expect(row.statement).toContain("8月24日22时播出");
-        if (depth === "focused") expect(row.statement).not.toMatch(/因为|见面会/);
-        else expect(row.statement).toContain("因为官方公布的特别节目");
-        if (depth === "deep") expect(row.statement).toContain("关联事项介绍");
-        else expect(row.statement).not.toContain("关联事项介绍");
+        expect(row.statement).toBe(detail);
       }
     });
   }
+
+  it("retains every validated statement beyond 10000 characters and synthesizes a separate overview", async () => {
+    const long = "节目表已确认。".repeat(2000) + "正文最后的确认事实。";
+    const { client, bodies } = clientWithOutputs([JSON.stringify({ cards: [{ ...card,
+      preview_summary: "作品甲已确认播出；作品乙节目表存在分歧。",
+      coverage: [{ entity: "作品甲", status: "confirmed", statement: long, source_indexes: [0] },
+        { entity: "作品乙", status: "conflict", statement: "不同节目表播出时段存在分歧。", source_indexes: [1] }],
+    }] })]);
+    const result = await client.synthesizeInformation({ ...project, informationDepth: "focused" }, items);
+    expect(result[0].summary).toContain(long);
+    expect(result[0].summary).toContain("正文最后的确认事实。");
+    expect(result[0].previewSummary).toBe("作品甲已确认播出；作品乙节目表存在分歧。");
+    const format = bodies[0].text as { format: { schema: { properties: { cards: { items: { required: string[] } } } } } };
+    expect(format.format.schema.properties.cards.items.required).toContain("preview_summary");
+  });
+
+  it("retains long organization and source-account results including their final facts", async () => {
+    const long = "确认事实。".repeat(2500) + "尾部完整事实";
+    const { client: organizer } = clientWithOutputs([JSON.stringify({ items: [{ index: 0, relevant: true,
+      title: "节目表", summary: long, type: "news", importance: 2, change_kind: "none" }] })]);
+    expect((await organizer.organizeInformation(project, items))[0].summary).toBe(long);
+    const { client: searcher } = clientWithOutputs([JSON.stringify({ items: [{ source_index: 0,
+      title: "节目表", summary: long, url: "https://anime.example/schedule", image_url: "https://anime.example/a.jpg",
+      image_caption: "作品甲官方节目播出表", images: [
+        { url: "https://anime.example/b.jpg", caption: "作品甲特别节目", source_url: "https://anime.example/schedule" },
+        { url: "https://other.example/c.jpg", caption: "伪造来源", source_url: "https://other.example/fake" },
+      ] }] })]);
+    const sources = [{ id: "account", projectId: project.id, type: "search", platform: "youtube",
+      name: "作品公式", url: "https://youtube.com/@anime", status: "active" }] as Source[];
+    const results = await searcher.searchLatestFromSources(project, sources);
+    expect(results[0].content).toBe(long);
+    expect(results[0].images).toHaveLength(2);
+    expect(results[0].images?.[0].caption).toBe("作品甲官方节目播出表");
+  });
+
+  it("preserves search descriptions and unverified image provenance without clipping generated text", async () => {
+    const long = "播出时间已确认。".repeat(1500) + "结尾完整事实";
+    const { client } = clientWithOutputs([JSON.stringify({ items: [
+      { entity: "作品甲", task: "播出时间变更", title: "节目表", summary: long,
+        url: "https://anime.example/a", image_url: "https://anime.example/schedule.jpg", image_caption: null },
+      { entity: "作品乙", task: "播出时间变更", title: "节目表", summary: long,
+        url: "https://anime.example/b", image_url: "https://anime.example/schedule-b.jpg", image_caption: "作品乙官方播出节目表" },
+    ] })]);
+    const result = await client.searchResearchWorkflow(project);
+    expect(result[0].content).toBe(long);
+    expect(result[0].images?.[0]).toMatchObject({ caption: null, relevance: "unverified", sourceUrl: "https://anime.example/a" });
+    expect(result[1].images?.[0].caption).toBe("作品乙官方播出节目表");
+  });
 
   it.each([
     { name: "another entity", override: { researchEntity: "作品乙" } },
@@ -912,8 +954,7 @@ describe("research depth and evidence boundaries", () => {
     expect(result.coverage.every((row) => row.status === "confirmed")).toBe(true);
     expect(result.sourceIndexes).toEqual([0, 1]);
     expect(result.summary).toContain("8月24日22时播出");
-    if (informationDepth === "focused") expect(result.summary).not.toContain("因为");
-    else expect(result.summary).toContain("关联事项介绍");
+    expect(result.summary).toContain("关联事项介绍"); // Already collected evidence is preserved in the reader.
   });
 
   it("drops invalid search evidence and duplicates without losing valid entity-task attribution", async () => {

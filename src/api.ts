@@ -1,3 +1,5 @@
+import { synthesisOverview } from "./shared/synthesis-preview";
+import { normalizeCardImages, summarizeCard } from "./shared/card-presentation";
 import type {
   AiSettings,
   Card,
@@ -177,7 +179,7 @@ const browserApi: ResearchBoardApi = {
     create: async (input) => {
       const card: Card = {
         id: crypto.randomUUID(), projectId: input.projectId, type: input.type, title: input.title,
-        content: input.content, imageUrl: input.imageUrl ?? null, sourceUrl: input.sourceUrl ?? null, sourceName: input.sourceName ?? null,
+        content: input.content, summary: input.summary ? summarizeCard(input.summary) : synthesisOverview({ summary: input.content }, /[\u4e00-\u9fff]/.test(input.content) ? "zh-CN" : "en"), images: normalizeCardImages(input.images), imageUrl: normalizeCardImages(input.images).find(image => image.relevance === "relevant")?.url ?? null, sourceUrl: input.sourceUrl ?? null, sourceName: input.sourceName ?? null,
         sourceLinks: input.sourceLinks ?? (input.sourceUrl ? [{ name: input.sourceName ?? input.sourceUrl, url: input.sourceUrl }] : []), focusCategory: input.focusCategory ?? null,
         occurredAt: input.occurredAt ?? null, importance: input.importance ?? 2, packId: null, packOrder: 0,
         locked: false, updateBatchId: input.updateBatchId ?? null, updateBatchAt: input.updateBatchAt ?? null,
@@ -201,7 +203,9 @@ const browserApi: ResearchBoardApi = {
     update: async (input) => {
       const index = cards.findIndex((card) => card.id === input.id);
       if (index < 0) throw new Error("卡片不存在");
-      cards[index] = { ...cards[index], ...input, occurredAt: input.occurredAt ?? null, updatedAt: new Date().toISOString() };
+      const textChanged = cards[index].content !== input.content || cards[index].title !== input.title;
+      const images = (cards[index].images ?? []).map(image => textChanged ? { ...image, relevance: "unverified" as const } : image);
+      cards[index] = { ...cards[index], ...input, images, imageUrl: textChanged ? null : cards[index].imageUrl, summary: synthesisOverview({ summary: input.content }, /[\u4e00-\u9fff]/.test(input.content) ? "zh-CN" : "en"), occurredAt: input.occurredAt ?? null, updatedAt: new Date().toISOString() };
       return cards[index];
     },
     setLocked: async (input) => {

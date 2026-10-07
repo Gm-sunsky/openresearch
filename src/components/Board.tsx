@@ -22,6 +22,7 @@ interface BoardProps {
   onAddNote(): void;
   selectedCardId: string | null;
   onSelect(cardId: string | null): void;
+  onOpen?(cardId: string): void;
   onPack(sourceCardId: string, targetCardId: string): void;
   onUnpack(cardId: string): void;
   onUnpackAll(packId: string): void;
@@ -35,7 +36,7 @@ const filters = [
   { value: "analysis", label: "analysis" }, { value: "timeline", label: "timeline" }, { value: "source", label: "source" }, { value: "note", label: "note" },
 ] as const satisfies ReadonlyArray<{ value: CardFilter; label: "all" | "news" | "event" | "analysis" | "timeline" | "source" | "note" }>;
 
-export function Board({ cards, loading, onMove, onResize, onAddNote, selectedCardId, onSelect, onPack, onUnpack, onUnpackAll, onDelete, onSetLocked, focusRequest }: BoardProps) {
+export function Board({ cards, loading, onMove, onResize, onAddNote, selectedCardId, onSelect, onOpen, onPack, onUnpack, onUnpackAll, onDelete, onSetLocked, focusRequest }: BoardProps) {
   const { t, locale } = useI18n();
   const [filter, setFilter] = useState<CardFilter>("all");
   const [query, setQuery] = useState("");
@@ -205,6 +206,7 @@ export function Board({ cards, loading, onMove, onResize, onAddNote, selectedCar
               onDragEnd={dragEnd}
               onResize={onResize}
               onSelect={onSelect}
+              onOpen={onOpen}
               onNavigate={(nextIndex) => movePackIndex(bundle.id, nextIndex, bundle.cards)}
               onUnpack={onUnpack}
               onUnpackAll={onUnpackAll}

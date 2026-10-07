@@ -49,15 +49,17 @@ export function CreateProjectDialog({ open, onClose, onCreated }: CreateProjectD
   };
 
   const create = async () => {
+    const request = ++requestId.current;
     setBusy(true); setError(null);
     try {
       const project = await api.projects.create({ prompt, name: name || draft?.name, draft: draft ? { ...draft, name: name || draft.name } : undefined });
+      if (request !== requestId.current) return;
       onCreated(project);
       onClose();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "项目创建失败");
+      if (request === requestId.current) setError(reason instanceof Error ? reason.message : "项目创建失败");
     } finally {
-      setBusy(false);
+      if (request === requestId.current) setBusy(false);
     }
   };
 

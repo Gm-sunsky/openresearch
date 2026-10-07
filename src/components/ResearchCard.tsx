@@ -3,6 +3,7 @@ import { api } from "../api";
 import { formatRelativeTime } from "../lib/format";
 import { cardContentLayout, resizeCardFrame, type ResizeEdge } from "../lib/card-resize";
 import type { Card } from "../shared/contracts";
+import { summarizeCard } from "../shared/card-presentation";
 import { AlertIcon, ExternalIcon, LockIcon, MoreIcon, SparkIcon, TrashIcon } from "./Icons";
 import { useI18n } from "../i18n";
 
@@ -15,8 +16,10 @@ interface ResearchCardProps {
   dropTarget: boolean;
   onDragMove(cardId: string, position: { x: number; y: number }): void;
   onDragEnd(cardId: string, position: { x: number; y: number }): void;
+  onDragCancel?(): void;
   onResize(cardId: string, position: { x: number; y: number }, size: { width: number; height: number }): void;
   onSelect(cardId: string): void;
+  onOpen?(cardId: string): void;
   onNavigate(index: number): void;
   onUnpack(cardId: string): void;
   onUnpackAll(packId: string): void;
@@ -58,8 +61,10 @@ export function ResearchCard({
   dropTarget,
   onDragMove,
   onDragEnd,
+  onDragCancel,
   onResize,
   onSelect,
+  onOpen,
   onNavigate,
   onUnpack,
   onUnpackAll,
@@ -78,7 +83,11 @@ export function ResearchCard({
     failed: boolean;
   } | null>(null);
   const imageRef = useRef<HTMLImageElement>(null);
-  const imageKey = `${card.id}:${card.imageUrl ?? ""}`;
+  const cancelDrag = useRef(onDragCancel);
+  cancelDrag.current = onDragCancel;
+  const pointerCapture = useRef<{ element: HTMLElement; pointerId: number } | null>(null);
+  const previewImageUrl = card.images?.find(image => image.url === card.imageUrl && image.relevance === "relevant" && Boolean(image.caption?.trim()))?.url;
+  const imageKey = `${card.id}:${previewImageUrl ?? ""}`;
   const currentImage = imageState?.key === imageKey ? imageState : null;
   const drag = useRef<DragState | null>(null);
   const resize = useRef<ResizeState | null>(null);
@@ -93,7 +102,33 @@ export function ResearchCard({
   useEffect(() => setPosition(card.position), [card.position]);
   useEffect(() => setSize(card.size), [card.size]);
   useEffect(() => setMenuOpen(false), [card.id]);
-  useEffect(() => () => resizeCleanup.current?.(), []);
+  useEffect(() => {
+    const cancelInteraction = () => {
+      const activeDrag = drag.current;
+      const activeResize = resize.current;
+      drag.current = null;
+      resize.current = null;
+      resizeCleanup.current?.();
+      resizeCleanup.current = null;
+      if (longPressTimer.current !== null) window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+      const capture = pointerCapture.current;
+      pointerCapture.current = null;
+      if (capture?.element.hasPointerCapture?.(capture.pointerId)) capture.element.releasePointerCapture(capture.pointerId);
+      if (activeResize) {
+        setPosition(activeResize.originPosition);
+        setSize(activeResize.originSize);
+      } else if (activeDrag) setPosition({ x: activeDrag.originX, y: activeDrag.originY });
+      if (activeDrag) cancelDrag.current?.();
+      setDragging(false);
+      setResizing(false);
+    };
+    window.addEventListener("blur", cancelInteraction);
+    return () => {
+      window.removeEventListener("blur", cancelInteraction);
+      cancelInteraction();
+    };
+  }, []);
 
   const clearLongPress = () => {
     if (longPressTimer.current !== null) window.clearTimeout(longPressTimer.current);
@@ -103,6 +138,7 @@ export function ResearchCard({
   const pointerDown = (event: PointerEvent<HTMLElement>) => {
     if (event.button !== 0 || resizing || (event.target as HTMLElement).closest("button, a, [role='menu'], [data-resize-handle]")) return;
     event.currentTarget.setPointerCapture(event.pointerId);
+    pointerCapture.current = { element: event.currentTarget, pointerId: event.pointerId };
     drag.current = {
       pointerId: event.pointerId,
       pointerType: event.pointerType,
@@ -169,7 +205,7 @@ export function ResearchCard({
     drag.current = null;
     setDragging(false);
     setPosition(card.position);
-    if (wasDragging) onDragEnd(card.id, card.position);
+    if (wasDragging) cancelDrag.current?.();
   };
 
   const switchWithWheel = (event: WheelEvent<HTMLElement>) => {
@@ -224,6 +260,7 @@ export function ResearchCard({
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
+    pointerCapture.current = { element: event.currentTarget, pointerId: event.pointerId };
     clearLongPress();
     resize.current = {
       pointerId: event.pointerId,
@@ -256,7 +293,7 @@ export function ResearchCard({
     setResizing(true);
   };
 
-  const layout = cardContentLayout(size, Boolean(card.imageUrl) && !currentImage?.failed, currentImage?.size);
+  const layout = cardContentLayout(size, Boolean(previewImageUrl) && !currentImage?.failed, currentImage?.size);
 
   return (
     <div
@@ -275,7 +312,12 @@ export function ResearchCard({
         onPointerMove={pointerMove}
         onPointerUp={finishPointer}
         onPointerCancel={cancelPointer}
+        onLostPointerCapture={cancelPointer}
         onWheel={switchWithWheel}
+        onDoubleClick={(event) => {
+          if (dragging || resizing || (event.target as HTMLElement).closest("button, a, [data-resize-handle]")) return;
+          onOpen?.(card.id);
+        }}
         title={packed ? "滚轮或横滑切换卡片；长按拆出当前卡片" : undefined}
       >
         <div className="card-grip" aria-hidden="true" />
@@ -288,6 +330,7 @@ export function ResearchCard({
             {card.focusCategory && <span className="card-focus-category" title={card.focusCategory}>{card.focusCategory}</span>}
           </div>
           <div className="flex items-center gap-1">
+            {onOpen && <button className="card-menu" type="button" aria-label={locale.startsWith("zh") ? "完整查看资料" : "Read full card"} title={locale.startsWith("zh") ? "完整查看资料（双击卡片）" : "Read full card (double-click)"} onClick={() => onOpen(card.id)}><ExternalIcon className="h-3.5 w-3.5" /></button>}
             {card.changeKind !== "none" && <span className={`change-badge ${card.changeKind}`} title={card.changeKind === "conflict" ? t("conflict") : t("changed")}><AlertIcon className="h-3 w-3" /></span>}
             {card.locked && <span className="card-lock" title={t("savedImportant")}><LockIcon className="h-3 w-3" /></span>}
             {packed && (
@@ -319,7 +362,7 @@ export function ResearchCard({
               <img
                 key={imageKey}
                 ref={imageRef}
-                src={card.imageUrl as string}
+                src={previewImageUrl}
                 alt={`${card.title} 的关键图片`}
                 loading="lazy"
                 draggable={false}
@@ -337,7 +380,7 @@ export function ResearchCard({
             </div>
           )}
           {!layout.compact && card.sourceUrl && <span className="card-summary-label">{t("coreInfo")}</span>}
-          {layout.contentLines > 0 && <p className="card-content whitespace-pre-line text-[12px] leading-[1.7] theme-text-secondary" style={{ WebkitLineClamp: layout.contentLines }}>{card.content}</p>}
+          {layout.contentLines > 0 && <p className="card-content whitespace-pre-line text-[12px] leading-[1.7] theme-text-secondary" style={{ WebkitLineClamp: layout.contentLines }}>{summarizeCard(card.summary || card.content, Math.max(12, Math.floor((size.width - 44) / 12) * layout.contentLines))}</p>}
           <footer className="mt-auto flex items-end justify-between gap-3 pt-5">
             <div className="min-w-0">
               {card.sourceName && <p className="truncate text-[10px] font-medium theme-text-secondary">{card.sourceName}</p>}
@@ -379,6 +422,7 @@ export function ResearchCard({
           data-resize-handle={edge}
           aria-label={`调整卡片${edge}边缘`}
           onPointerDown={(event) => beginResize(event, edge)}
+          onLostPointerCapture={(event) => completeResize(event.pointerId, true)}
         />
       ))}
       {resizing && <div className="card-size-readout">{Math.round(size.width)} × {Math.round(size.height)}</div>}

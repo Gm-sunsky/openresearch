@@ -92,3 +92,21 @@ describe("timeline date editor", () => {
     expect(props.onSaveCard).toHaveBeenCalledWith(expect.objectContaining({ occurredAt: null }));
   });
 });
+
+
+describe("card editing during background refresh", () => {
+  it("keeps the unsaved draft when polling replaces the selected card object", async () => {
+    await render(selectedCard);
+    const input = container.querySelector<HTMLInputElement>('input[placeholder="标题"]')!;
+    input.focus();
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "正在输入的草稿");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await render({ ...selectedCard, position: { x: 200, y: 300 }, updatedAt: "2026-10-06T00:00:00Z" });
+    expect(input.value).toBe("正在输入的草稿");
+    expect(document.activeElement).toBe(input);
+    await render({ ...selectedCard, id: "other", title: "另一张卡片" });
+    expect(input.value).toBe("另一张卡片");
+  });
+});

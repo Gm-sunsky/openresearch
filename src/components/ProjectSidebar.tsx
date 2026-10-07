@@ -33,6 +33,7 @@ export function ProjectSidebar({ projects, selectedId, onSelect, onToggleUpdate,
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
+      if (event.isComposing || event.keyCode === 229 || document.querySelector('[aria-modal="true"]')) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setSearchOpen(true);
@@ -72,6 +73,7 @@ export function ProjectSidebar({ projects, selectedId, onSelect, onToggleUpdate,
             aria-label={t("searchProjects")} placeholder={chinese ? "名称、简介、目标或关注项" : "Name, description, goal or focus"}
             className="min-w-0 flex-1 bg-transparent py-1 text-[11px] text-white outline-none placeholder:text-white/40"
             onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing || event.keyCode === 229) return;
               if (event.key === "Escape") {
                 event.preventDefault();
                 closeSearch();

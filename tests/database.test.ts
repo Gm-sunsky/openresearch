@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -70,7 +70,7 @@ describe("ResearchDatabase", () => {
 
     const reopened = await ResearchDatabase.open(filePath, wasmPath);
     expect(reopened.listCards(project.id).find((item) => item.id === card.id)?.position).toEqual({ x: 420, y: 260 });
-    expect(reopened.listCards(project.id).find((item) => item.id === card.id)).toMatchObject({ imageUrl: "https://example.com/launch.jpg", size: { width: 440, height: 360 } });
+    expect(reopened.listCards(project.id).find((item) => item.id === card.id)).toMatchObject({ imageUrl: null, images: [{ url: "https://example.com/launch.jpg", caption: null, relevance: "unverified" }], size: { width: 440, height: 360 } });
     reopened.close();
   });
 
@@ -272,4 +272,48 @@ describe("ResearchDatabase", () => {
     expect(database.listInformationChanges(project.id)[0].resolved).toBe(true);
     database.close();
   });
+});
+
+it("persists full material, preview summaries, and all captioned or unknown images", async () => {
+  const { database, filePath, wasmPath } = await createDatabase();
+  const project = database.createProject({ name: "Material", description: "", goal: "Research", focus: [], updateFrequency: "daily" });
+  const content = "核心事实：开票日期10月8日。\n" + "完整研究材料与交叉核验。".repeat(700);
+  const images = Array.from({ length: 45 }, (_, index) => ({ url: `https://example.com/${index}.jpg`, caption: index === 0 ? "10月8日开票公告" : null, relevance: index === 0 ? "relevant" as const : "unverified" as const }));
+  const card = database.createCard({ projectId: project.id, type: "news", title: "开票日期", content, imageUrl: images[0].url, images });
+  expect(card.content).toBe(content);
+  expect(card.summary!.length).toBeLessThanOrEqual(160);
+  expect(card.images).toHaveLength(45);
+  expect(card.imageUrl).toBe(images[0].url);
+  database.close();
+  const reopened = await ResearchDatabase.open(filePath, wasmPath);
+  const restored = reopened.listCards(project.id)[0];
+  expect(restored.content).toBe(content);
+  expect(restored.images).toEqual(images);
+  const edited = reopened.updateCard({ id: restored.id, type: restored.type, title: "新主题", content: "新的核心事实", importance: restored.importance });
+  expect(edited.imageUrl).toBeNull();
+  expect(edited.images).toHaveLength(45);
+  expect(edited.images!.every(image => image.relevance === "unverified")).toBe(true);
+  expect(edited.summary).toBe("新的核心事实");
+  reopened.close();
+});
+
+it("upgrades a version-10 profile without losing old text or uncaptained images", async () => {
+  const { database, filePath, wasmPath } = await createDatabase();
+  const project = database.createProject({ name: "Old profile", description: "", goal: "Research", focus: [], updateFrequency: "daily" });
+  const content = "旧卡片中的完整整理材料。".repeat(500);
+  const card = database.createCard({ projectId: project.id, type: "news", title: "Legacy", content, imageUrl: "https://example.com/old.jpg" });
+  database.close();
+  const SQL = await initSqlJs({ locateFile: () => wasmPath });
+  const legacy = new SQL.Database(readFileSync(filePath));
+  legacy.run("ALTER TABLE cards DROP COLUMN summary; ALTER TABLE cards DROP COLUMN images_json; PRAGMA user_version = 10");
+  writeFileSync(filePath, Buffer.from(legacy.export())); legacy.close();
+  const upgraded = await ResearchDatabase.open(filePath, wasmPath);
+  const restored = upgraded.listCards(project.id).find(item => item.id === card.id)!;
+  expect(restored.content).toBe(content);
+  expect(restored.summary!.length).toBeLessThanOrEqual(160);
+  expect(restored.imageUrl).toBeNull();
+  expect(restored.images).toContainEqual(expect.objectContaining({ url: "https://example.com/old.jpg", caption: null, relevance: "unverified" }));
+  upgraded.close();
+  const persisted = new SQL.Database(readFileSync(filePath));
+  expect(persisted.exec("PRAGMA user_version")[0].values[0][0]).toBe(11); persisted.close();
 });

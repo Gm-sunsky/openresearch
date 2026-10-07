@@ -74,7 +74,8 @@ export function Inspector({
   const [savingCard, setSavingCard] = useState(false);
 
   useEffect(() => {
-    setCardForm(selectedCard ? {
+    // Background polling replaces Card objects; retain the active editing session.
+    setCardForm(current => current?.id === selectedCard?.id ? current : selectedCard ? {
       id: selectedCard.id,
       type: selectedCard.type,
       title: selectedCard.title,

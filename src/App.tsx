@@ -1,6 +1,10 @@
+import { ConfirmDialog } from "./components/ConfirmDialog";
+import { useConfirmation } from "./lib/use-confirmation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import { Board, type CardFocusRequest } from "./components/Board";
+import { CardReader } from "./components/CardReader";
+import { groupCardBundles } from "./lib/card-packs";
 import { CreateProjectDialog } from "./components/CreateProjectDialog";
 import { Inspector } from "./components/Inspector";
 import { ChevronIcon, MoreIcon, PlusIcon, RefreshIcon, SparkIcon } from "./components/Icons";
@@ -20,6 +24,7 @@ interface Toast {
 
 export default function App() {
   const { t, locale, setLanguage } = useI18n();
+  const confirmation = useConfirmation();
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [cards, setCards] = useState<Card[]>([]);
@@ -42,6 +47,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [projectSettingsOpen, setProjectSettingsOpen] = useState(false);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [readerCardId, setReaderCardId] = useState<string | null>(null);
   const [cardFocusRequest, setCardFocusRequest] = useState<CardFocusRequest | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
 
@@ -50,6 +56,8 @@ export default function App() {
   const readyForUpdate = selectedForUpdate.filter((item) => !updatingIds.has(item.id));
   const discovering = selectedId !== null && discoveringIds.has(selectedId);
   const selectedCard = useMemo(() => cards.find((item) => item.id === selectedCardId) ?? null, [cards, selectedCardId]);
+  const readerCard = cards.find((item) => item.id === readerCardId && item.projectId === selectedId);
+  const readerCards = readerCard ? groupCardBundles(cards).find((bundle) => bundle.cards.some((item) => item.id === readerCard.id))?.cards ?? [readerCard] : [];
 
   const notify = useCallback((message: string, tone: Toast["tone"] = "default") => {
     const next = { id: Date.now(), message, tone };
@@ -64,6 +72,7 @@ export default function App() {
     setSelectedId(projectId);
     setCards([]); setSources([]); setCandidates([]); setTaskRuns([]); setChanges([]);
     setSelectedCardId(null); setCardFocusRequest(null); setLoading(Boolean(projectId));
+    setReaderCardId(null);
     setProjectSettingsOpen(false);
   }, []);
 
@@ -189,7 +198,7 @@ export default function App() {
         projectId: selectedId,
         type: "note",
         title: "新的研究笔记",
-        content: "双击标题可在后续版本中编辑。这张卡片的位置会自动保存。",
+        content: locale.startsWith("zh") ? "在右栏编辑笔记；双击卡片可完整查看资料。位置会自动保存。" : "Edit this note in the sidebar; double-click the card to read the full material. Its position is saved automatically.",
         position: { x: 110, y: 110 },
       });
       if (selectedIdRef.current === card.projectId) {
@@ -234,7 +243,7 @@ export default function App() {
 
   const removeSource = async (sourceId: string) => {
     const source = sources.find((item) => item.id === sourceId);
-    if (source && !window.confirm(`移除信息源「${source.name}」？已生成的卡片不会被删除。`)) return;
+    if (source && !await confirmation.confirm(`移除信息源「${source.name}」？已生成的卡片不会被删除。`)) return;
     await api.sources.remove(sourceId);
     if (source) await reloadProject(source.projectId);
     await loadProjects();
@@ -267,7 +276,7 @@ export default function App() {
 
   const removeCard = async (cardId: string) => {
     const card = cards.find((item) => item.id === cardId);
-    if (!card || !window.confirm(`删除卡片「${card.title}」？`)) return;
+    if (!card || !await confirmation.confirm(`删除卡片「${card.title}」？`)) return;
     try {
       await api.cards.remove(cardId);
       if (selectedIdRef.current === selectedId) setSelectedCardId(null);
@@ -373,7 +382,7 @@ export default function App() {
   };
 
   const deleteProject = async () => {
-    if (!project || !window.confirm(`删除「${project.name}」及其全部卡片和信息源？此操作无法撤销。`)) return;
+    if (!project || !await confirmation.confirm(`删除「${project.name}」及其全部卡片和信息源？此操作无法撤销。`)) return;
     try {
       await api.projects.remove(project.id);
       if (selectedIdRef.current === project.id) { setProjectSettingsOpen(false); selectProject(null); }
@@ -429,6 +438,7 @@ export default function App() {
                 onAddNote={addNote}
                 selectedCardId={selectedCardId}
                 onSelect={setSelectedCardId}
+                onOpen={setReaderCardId}
                 onPack={(sourceCardId, targetCardId) => void packCards(sourceCardId, targetCardId)}
                 onUnpack={(cardId) => void unpackCard(cardId)}
                 onUnpackAll={(packId) => void unpackAllCards(packId)}
@@ -500,7 +510,9 @@ export default function App() {
         onDelete={deleteProject}
       />
 
+      <ConfirmDialog message={confirmation.message} onResolve={confirmation.onResolve} />
       {toast && <div className={`toast ${toast.tone}`} key={toast.id}>{toast.message}</div>}
+      {readerCard && <CardReader key={readerCard.projectId} card={readerCard} cards={readerCards} onNavigate={setReaderCardId} onClose={() => setReaderCardId(null)} />}
     </main>
   );
 }

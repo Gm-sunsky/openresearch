@@ -1,3 +1,4 @@
+import { normalizeCardImages } from "../../src/shared/card-presentation";
 import { ipcMain, shell } from "electron";
 import type {
   AcceptSourceCandidatesInput,
@@ -90,6 +91,7 @@ function normalizeCardInput(value: unknown): CreateCardInput {
     type: input.type as CardType,
     title: requiredString(input.title, "卡片标题", 160),
     content: requiredString(input.content, "卡片内容", 8_000),
+    images: normalizeCardImages(input.images),
     imageUrl: input.imageUrl ? safeHttpUrl(input.imageUrl) : null,
     sourceUrl: input.sourceUrl ? safeHttpUrl(input.sourceUrl) : null,
     sourceName: optionalString(input.sourceName, 120) ?? null,

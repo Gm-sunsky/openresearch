@@ -46,7 +46,9 @@ describe("FeedService project agent", () => {
     const collected = database.listCards(project.id).find((card) => card.title === "独库公路恢复通行");
 
     expect(result).toMatchObject({ newCards: 2, errors: [], warnings: [] });
-    expect(collected).toMatchObject({ type: "event", title: "独库公路恢复通行", imageUrl: "https://example.com/road.jpg", importance: 3 });
+    // The enclosure has no actual image description; article relevance alone is insufficient.
+    expect(collected).toMatchObject({ type: "event", title: "独库公路恢复通行", imageUrl: null, importance: 3 });
+    expect(collected?.images).toContainEqual(expect.objectContaining({ url: "https://example.com/road.jpg", caption: null, relevance: "unverified" }));
     expect(collected?.content).toContain("道路已经开放。");
     expect(collected?.content).toContain("Evidence cutoff");
     const batchCards = database.listCards(project.id).filter((card) => card.updateBatchId === result.runId);
@@ -277,4 +279,33 @@ describe("FeedService project agent", () => {
     expect(card?.content).not.toContain("当前来源未提供可确认的信息");
     database.close();
   });
+});
+
+it("keeps supplementary source images in the reader without using them as core previews", async () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "research-board-images-")); temporaryDirectories.push(directory);
+  const database = await ResearchDatabase.open(path.join(directory, "test.sqlite"), path.resolve("node_modules/sql.js/dist/sql-wasm.wasm"));
+  const project = database.createProject({ name: "Falcon", description: "Launch", goal: "Falcon launch", focus: ["Launch"], updateFrequency: "daily" });
+  database.createSource({ projectId: project.id, type: "web", name: "Primary", url: "https://primary.example/status" });
+  database.createSource({ projectId: project.id, type: "web", name: "Archive", url: "https://archive.example/material" });
+  const ai = {
+    canSearchWeb: () => false,
+    getPreferences: () => ({ language: "en", maxUpdateBatches: 20 }),
+    shouldOrganizeContent: () => true,
+    synthesizeInformation: async (_project: unknown, items: Array<{ index: number; url: string }>) => {
+      const primary = items.find(item => item.url === "https://primary.example/status")!;
+      return [{ focusCategory: "Launch", sourceIndexes: [primary.index], coverage: [{ entity: "Falcon", status: "confirmed", statement: "Falcon rocket launch confirmed.", sourceIndexes: [primary.index] }],
+        type: "news", title: "Launch confirmed", summary: "Falcon rocket launch confirmed.", previewSummary: "Falcon rocket launch confirmed.", importance: 2, occurredAt: null,
+        asOf: "2026-10-07T00:00:00Z", confidence: "high", changeKind: "none", previousCardId: null, changeSummary: null }];
+    },
+  } as unknown as AiApiClient;
+  const service = new FeedService(database, async url => new Response(url.includes("primary.example")
+    ? '<title>Falcon launch</title><p>Falcon rocket launch confirmed.</p><img src="/core.jpg" alt="Falcon rocket launch confirmed">'
+    : '<title>Additional collected material</title><p>Archive material.</p><img src="/unknown.jpg">', { status: 200 }), ai);
+  try {
+    await service.runProject(project.id);
+    const card = database.listCards(project.id)[0];
+    expect(card.imageUrl).toBe("https://primary.example/core.jpg");
+    expect(card.sourceLinks).toHaveLength(1);
+    expect(card.images).toContainEqual(expect.objectContaining({ url: "https://archive.example/unknown.jpg", relevance: "unverified", caption: null }));
+  } finally { database.close(); }
 });

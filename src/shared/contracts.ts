@@ -60,7 +60,16 @@ export interface CardSourceLink {
   url: string;
 }
 
+export interface CardImage {
+  url: string;
+  caption: string | null;
+  sourceUrl?: string | null;
+  relevance: "relevant" | "unverified";
+}
+
 export interface Card {
+  summary?: string;
+  images?: CardImage[];
   id: string;
   projectId: string;
   type: CardType;
@@ -86,6 +95,8 @@ export interface Card {
 }
 
 export interface CreateCardInput {
+  summary?: string;
+  images?: CardImage[];
   projectId: string;
   type: CardType;
   title: string;

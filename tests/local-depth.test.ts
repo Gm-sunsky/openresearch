@@ -96,13 +96,22 @@ describe("local information depth", () => {
   });
 
   it("gives image cards the chosen depth size and preserves a later user resize", async () => {
-    const { database, project, service } = await setup("focused", [{ ...evidence("本周播出时间为10月8日20时。"), imageUrl: "https://official.example/poster.png" }]);
+    const { database, project, service } = await setup("focused", [{ ...evidence("本周播出时间为10月8日20时。"), imageUrl: "https://official.example/poster.png", images: [{ url: "https://official.example/poster.png", caption: "星海本周播出时间为10月8日20时的官方节目表", relevance: "relevant" as const }] }]);
     await service.runProject(project.id);
     const card = database.listCards(project.id)[0];
     expect(card.size).toEqual({ width: 330, height: 310 });
     database.updateCardLayout({ id: card.id, position: card.position, size: { width: 500, height: 580 } });
     await service.runProject(project.id);
     expect(database.listCards(project.id).find((item) => item.id === card.id)?.size).toEqual({ width: 500, height: 580 });
+  });
+
+  it("keeps images without captions in detail without increasing preview height", async () => {
+    const { database, project, service } = await setup("focused", [evidence("本周播出时间为10月8日20时。", { imageUrl: "https://official.example/poster.png" })]);
+    await service.runProject(project.id);
+    const card = database.listCards(project.id)[0];
+    expect(card.size).toEqual({ width: 330, height: 250 });
+    expect(card.imageUrl).toBeNull();
+    expect(card.images).toContainEqual(expect.objectContaining({ url: "https://official.example/poster.png", relevance: "unverified" }));
   });
 
   it.each([false, true])("does not confirm unrelated results even with task and source labels (AI failure: %s)", async (failAi) => {

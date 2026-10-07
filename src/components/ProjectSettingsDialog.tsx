@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Project, UpdateProjectInput } from "../shared/contracts";
 import { INFORMATION_DEPTH_POLICIES, informationDepthPolicy, normalizeInformationDepth } from "../shared/information-depth";
 import { CloseIcon, TrashIcon } from "./Icons";
@@ -20,8 +20,12 @@ export function ProjectSettingsDialog({ open, project, onClose, onSave, onDelete
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const editingProject = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!open || !project) return;
+    if (!open || !project) { editingProject.current = null; return; }
+    if (editingProject.current === project.id) return;
+    editingProject.current = project.id;
     setForm({
       id: project.id,
       name: project.name,

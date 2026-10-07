@@ -8,7 +8,7 @@ OpenResearch 是一个本地优先的 Windows 与 macOS 信息项目工作台。
 
 ## 当前版本
 
-V1.5.3 新增项目搜索、右栏数据目录打开、统一系统深浅色主题，以及可排序、可定位的时间线视图。卡片详情支持编辑事件日期。[版本说明](docs/RELEASE_NOTES_V1_5_3.md)。
+V1.5.4 新增按真实图注筛选核心配图、独立概述及完整资料窗口，并修补输入草稿被刷新覆盖与失焦残留监听。保留项目搜索、数据目录打开、系统深浅色及时间线。[版本说明](docs/RELEASE_NOTES_V1_5_4.md)。
 
 已实现：
 
@@ -112,10 +112,10 @@ npm run dist:win
 npm run dist:mac:portable
 ```
 
-安装包输出到 `release/V1.5.3/OpenResearch Setup 1.5.3.exe`。
-免安装压缩包输出到 `release/V1.5.3/OpenResearch Portable 1.5.3.zip`，完整解压后运行其中的 `OpenResearch.exe`。
+安装包输出到 `release/V1.5.4/OpenResearch Setup 1.5.4.exe`。
+免安装压缩包输出到 `release/V1.5.4/OpenResearch Portable 1.5.4.zip`，完整解压后运行其中的 `OpenResearch.exe`。
 
-macOS 免安装版输出为 `release/V1.5.3/OpenResearch macOS arm64 1.5.3.zip`（Apple 芯片）和 `release/V1.5.3/OpenResearch macOS x64 1.5.3.zip`（Intel）。解压后直接打开 `OpenResearch.app`；未签名测试版首次打开时请按住 Control 点击应用，选择“打开”。后续版本会自动创建各自的 `release/V版本号/` 目录。
+macOS 免安装版输出为 `release/V1.5.4/OpenResearch macOS arm64 1.5.4.zip`（Apple 芯片）和 `release/V1.5.4/OpenResearch macOS x64 1.5.4.zip`（Intel）。解压后直接打开 `OpenResearch.app`；未签名测试版首次打开时请按住 Control 点击应用，选择“打开”。后续版本会自动创建各自的 `release/V版本号/` 目录。
 
 ## 架构
 
@@ -149,13 +149,13 @@ API 与来源发现的边界、接口和安全策略见 [API 与来源发现设�
 
 ## GitHub 项目与跨平台发布
 
-当前版本为 **1.5.3**。本地 Windows NSIS 安装包及 Windows、macOS arm64/x64 便携包输出在 `release/V1.5.3/`。上传完成后从本仓库 Releases 下载对应平台版本。
+当前版本为 **1.5.4**。本地 Windows NSIS 安装包及 Windows、macOS arm64/x64 便携包输出在 `release/V1.5.4/`。上传完成后从本仓库 Releases 下载对应平台版本。
 
-macOS 原生安装包需在 Mac 上运行 `npm run dist:mac`，生成 Apple Silicon 与 Intel 的 DMG、ZIP，输出到 `release/`。已有 `.github/workflows/release.yml` 会在 Windows 与 macOS 分别完成 lint、类型检查、测试和打包。手动触发可取得构建产物；推送与 package.json 一致的版本标签（如 `v1.5.3`）会在两平台成功后发布 GitHub Release 和 SHA256 校验值。工作流需要启用 GitHub Actions，并受账号用量限制。
+macOS 原生安装包需在 Mac 上运行 `npm run dist:mac`，生成 Apple Silicon 与 Intel 的 DMG、ZIP，输出到 `release/`。已有 `.github/workflows/release.yml` 会在 Windows 与 macOS 分别完成 lint、类型检查、测试和打包。手动触发可取得构建产物；推送与 package.json 一致的版本标签（如 `v1.5.4`）会在两平台成功后发布 GitHub Release 和 SHA256 校验值。工作流需要启用 GitHub Actions，并受账号用量限制。
 
 ### 安装、数据与升级
 
-Windows 安装版运行 `OpenResearch Setup 1.5.3.exe`；便携版完整解压后运行 `OpenResearch.exe`。Mac 请选择与芯片匹配的 ZIP，解压后把 `OpenResearch.app` 移入 Applications；DMG 则打开后拖入 Applications。
+Windows 安装版运行 `OpenResearch Setup 1.5.4.exe`；便携版完整解压后运行 `OpenResearch.exe`。Mac 请选择与芯片匹配的 ZIP，解压后把 `OpenResearch.app` 移入 Applications；DMG 则打开后拖入 Applications。
 
 更名保留原应用标识与数据目录：Windows 为 `%APPDATA%/AI Research Board`，macOS 为 `~/Library/Application Support/AI Research Board`；数据库文件仍是 `research-board.sqlite`。设置页可打开数据目录或备份。原语言偏好继续保留。
 
@@ -177,3 +177,9 @@ Windows 安装版运行 `OpenResearch Setup 1.5.3.exe`；便携版完整解压�
 
 目前未授予开源许可证；上传 GitHub 不自动授予修改或再分发授权。
 升级时也会检查旧 ai-research-board 数据目录；如果原数据库位于该目录，将继续使用它。
+
+## 阅读完整资料
+
+双击卡片或点击卡片上的完整查看按钮，即可阅读保存的完整整理正文和图片。滚轮或上下方向键滚动，左右方向键或顶部按钮切换卡包资料页，Esc 关闭。卡片只显示独立的精简概述和有实际图注证据支持的核心配图；无说明或关联待确认的图片保留在资料窗口。旧版本已经丢弃的文字需重新更新才能重新整理。
+
+输入异常的排查、已确认原因和验证边界见 [1.5.4 版本说明](docs/RELEASE_NOTES_V1_5_4.md)。

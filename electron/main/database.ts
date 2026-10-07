@@ -1,3 +1,5 @@
+import { synthesisOverview } from "../../src/shared/synthesis-preview";
+import { normalizeCardImages, summarizeCard } from "../../src/shared/card-presentation";
 import { createHash, randomUUID } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -295,6 +297,8 @@ export class ResearchDatabase {
     this.ensureColumn("cards", "pack_id", "TEXT");
     this.ensureColumn("cards", "pack_order", "INTEGER NOT NULL DEFAULT 0");
     this.ensureColumn("cards", "image_url", "TEXT");
+    this.ensureColumn("cards", "summary", "TEXT");
+    this.ensureColumn("cards", "images_json", "TEXT NOT NULL DEFAULT '[]'");
     this.ensureColumn("cards", "locked", "INTEGER NOT NULL DEFAULT 0");
     this.ensureColumn("cards", "update_batch_id", "TEXT");
     this.ensureColumn("cards", "update_batch_at", "TEXT");
@@ -308,7 +312,7 @@ export class ResearchDatabase {
     this.db.run("CREATE INDEX IF NOT EXISTS idx_cards_pack ON cards(project_id, pack_id, pack_order)");
     this.db.run("CREATE INDEX IF NOT EXISTS idx_cards_update_batch ON cards(project_id, update_batch_at, update_batch_id)");
     this.db.run("UPDATE update_runs SET status = CASE WHEN finished_at IS NULL THEN 'running' WHEN json_array_length(error_json) > 0 THEN 'partial' ELSE 'completed' END WHERE status IS NULL OR status = ''");
-    this.db.run("PRAGMA user_version = 10");
+    this.db.run("PRAGMA user_version = 11");
   }
 
   private ensureColumn(table: string, column: string, definition: string): void {
@@ -475,12 +479,12 @@ export class ResearchDatabase {
     this.transaction(() => {
       this.db.run(`
         INSERT INTO cards (
-          id, project_id, type, title, content, image_url, source_url, source_name, source_links_json,
+          id, project_id, type, title, content, summary, images_json, image_url, source_url, source_name, source_links_json,
           source_fingerprint, focus_category, occurred_at,
           importance, update_batch_id, update_batch_at, change_kind,
           position_x, position_y, width, height, created_at, updated_at
         ) VALUES (
-          $id, $projectId, $type, $title, $content, $imageUrl, $sourceUrl, $sourceName, $sourceLinks,
+          $id, $projectId, $type, $title, $content, $summary, $images, $imageUrl, $sourceUrl, $sourceName, $sourceLinks,
           $sourceFingerprint, $focusCategory, $occurredAt,
           $importance, $updateBatchId, $updateBatchAt, $changeKind,
           $x, $y, $width, $height, $now, $now
@@ -491,6 +495,8 @@ export class ResearchDatabase {
         $type: input.type,
         $title: input.title,
         $content: input.content,
+        $summary: input.summary ? summarizeCard(input.summary) : synthesisOverview({ summary: input.content }, /[\u4e00-\u9fff]/.test(input.content) ? "zh-CN" : "en"),
+        $images: JSON.stringify(normalizeCardImages(input.images ?? (input.imageUrl ? [{ url: input.imageUrl, caption: null, relevance: "unverified" }] : []))),
         $imageUrl: input.imageUrl ?? null,
         $sourceUrl: input.sourceUrl ?? null,
         $sourceName: input.sourceName ?? null,
@@ -561,10 +567,13 @@ export class ResearchDatabase {
   }
 
   updateCard(input: UpdateCardInput): Card {
+    const previous = this.findCard(input.id);
+    const textChanged = previous?.content !== input.content || previous?.title !== input.title;
+    const images = (previous?.images ?? []).map(image => textChanged ? { ...image, relevance: "unverified" as const } : image);
     const now = new Date().toISOString();
     this.transaction(() => {
       this.db.run(`
-        UPDATE cards SET type = $type, title = $title, content = $content,
+        UPDATE cards SET type = $type, title = $title, content = $content, summary = $summary, images_json = $images, image_url = $imageUrl,
           occurred_at = $occurredAt, importance = $importance, updated_at = $now
         WHERE id = $id
       `, {
@@ -572,6 +581,9 @@ export class ResearchDatabase {
         $type: input.type,
         $title: input.title,
         $content: input.content,
+        $summary: synthesisOverview({ summary: input.content }, /[\u4e00-\u9fff]/.test(input.content) ? "zh-CN" : "en"),
+        $images: JSON.stringify(images),
+        $imageUrl: textChanged ? null : previous?.imageUrl ?? null,
         $occurredAt: input.occurredAt ?? null,
         $importance: Math.max(1, Math.min(3, input.importance)),
         $now: now,
@@ -1025,13 +1037,19 @@ export class ResearchDatabase {
   }
 
   private mapCard(row: Row): Card {
+    let storedImages: unknown = [];
+    try { storedImages = JSON.parse(asString(row.images_json) || "[]"); } catch { /* Legacy or corrupt metadata has no trusted captions. */ }
+    const legacyImage = asNullableString(row.image_url);
+    const images = normalizeCardImages([...(Array.isArray(storedImages) ? storedImages : []), ...(legacyImage ? [{ url: legacyImage, caption: null, relevance: "unverified" }] : [])]);
     return {
       id: asString(row.id),
       projectId: asString(row.project_id),
       type: asString(row.type) as Card["type"],
       title: asString(row.title),
       content: asString(row.content),
-      imageUrl: asNullableString(row.image_url),
+      summary: asString(row.summary) ? summarizeCard(asString(row.summary)) : synthesisOverview({ summary: asString(row.content) }, /[\u4e00-\u9fff]/.test(asString(row.content)) ? "zh-CN" : "en"),
+      images,
+      imageUrl: images.find(image => image.relevance === "relevant")?.url ?? null,
       sourceUrl: asNullableString(row.source_url),
       sourceName: asNullableString(row.source_name),
       sourceLinks: parseSourceLinks(row.source_links_json, asNullableString(row.source_url), asNullableString(row.source_name)),

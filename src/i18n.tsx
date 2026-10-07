@@ -5,6 +5,7 @@ type Key = keyof typeof zh;
 type Dictionary = Record<Key, string>;
 
 const zh = {
+  confirmationTitle: "确认操作", confirmDeletion: "确认删除",
   eventDate: "事件日期", eventDateHint: "留空时，时间线使用卡片创建日期。",
   boardView: "白板", timelineView: "时间线", newestFirst: "最新优先", oldestFirst: "最早优先", unknownDate: "日期未知", timelineHint: "按事件日期排列，未注明事件日期时使用创建日期。",
   openDataFolder: "打开数据目录", openingDataFolder: "正在打开…", dataFolderError: "无法打开数据目录，请稍后重试。",
@@ -38,6 +39,7 @@ const zh = {
 } as const;
 
 const en: Dictionary = {
+  confirmationTitle: "Confirm action", confirmDeletion: "Delete",
   eventDate: "Event date", eventDateHint: "Leave blank to use the card creation date in the timeline.",
   boardView: "Board", timelineView: "Timeline", newestFirst: "Newest first", oldestFirst: "Oldest first", unknownDate: "Unknown date", timelineHint: "Ordered by event date, or creation date when no event date is available.",
   openDataFolder: "Open data folder", openingDataFolder: "Opening…", dataFolderError: "Unable to open the data folder. Please try again.",

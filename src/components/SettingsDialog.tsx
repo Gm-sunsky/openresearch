@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import type { AiSettings, ApiProvider, ApiProtocol, SaveAiSettingsInput } from "../shared/contracts";
 import { CheckIcon, CloseIcon, KeyIcon, ShieldIcon } from "./Icons";
@@ -27,16 +27,20 @@ function inputFrom(settings: AiSettings): SaveAiSettingsInput {
 
 export function SettingsDialog({ open, settings, onClose, onSaved }: SettingsDialogProps) {
   const { t } = useI18n();
+  const session = useRef({ open: false, id: 0 });
   const [form, setForm] = useState<SaveAiSettingsInput | null>(null);
   const [busy, setBusy] = useState<"save" | "test" | "backup" | null>(null);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
 
   useEffect(() => {
-    if (open && settings) {
-      setForm(inputFrom(settings));
-      setMessage(null);
-      setBusy(null);
+    if (!open) {
+      session.current = { open: false, id: session.current.id + 1 };
+      setForm(null); setMessage(null); setBusy(null);
+      return;
     }
+    if (!settings || session.current.open) return;
+    session.current = { open: true, id: session.current.id + 1 };
+    setForm(inputFrom(settings)); setMessage(null); setBusy(null);
   }, [open, settings]);
 
   if (!open || !settings || !form) return null;
@@ -52,28 +56,32 @@ export function SettingsDialog({ open, settings, onClose, onSaved }: SettingsDia
   };
 
   const save = async () => {
+    const request = session.current.id;
     setBusy("save"); setMessage(null);
     try {
       const saved = await api.settings.save(form);
       onSaved(saved);
+      if (request !== session.current.id) return;
       setForm(inputFrom(saved));
       setMessage({ text: "设置已安全保存", error: false });
     } catch (error) {
-      setMessage({ text: error instanceof Error ? error.message : "设置保存失败", error: true });
+      if (request === session.current.id) setMessage({ text: error instanceof Error ? error.message : "设置保存失败", error: true });
     } finally {
-      setBusy(null);
+      if (request === session.current.id) setBusy(null);
     }
   };
 
   const test = async () => {
+    const request = session.current.id;
     setBusy("test"); setMessage(null);
     try {
       const result = await api.settings.test(form);
+      if (request !== session.current.id) return;
       setMessage({ text: `${result.message} · ${result.model} · ${result.latencyMs} ms`, error: false });
     } catch (error) {
-      setMessage({ text: error instanceof Error ? error.message : "连接测试失败", error: true });
+      if (request === session.current.id) setMessage({ text: error instanceof Error ? error.message : "连接测试失败", error: true });
     } finally {
-      setBusy(null);
+      if (request === session.current.id) setBusy(null);
     }
   };
 
@@ -83,22 +91,25 @@ export function SettingsDialog({ open, settings, onClose, onSaved }: SettingsDia
   };
 
   const createBackup = async () => {
+    const request = session.current.id;
     setBusy("backup"); setMessage(null);
     try {
       const result = await api.maintenance.createBackup();
+      if (request !== session.current.id) return;
       setMessage({ text: `备份已创建 · ${(result.sizeBytes / 1024).toFixed(0)} KB`, error: false });
     } catch (error) {
-      setMessage({ text: error instanceof Error ? error.message : "备份创建失败", error: true });
+      if (request === session.current.id) setMessage({ text: error instanceof Error ? error.message : "备份创建失败", error: true });
     } finally {
-      setBusy(null);
+      if (request === session.current.id) setBusy(null);
     }
   };
 
   const openDataFolder = async () => {
+    const request = session.current.id;
     try {
       await api.maintenance.openDataFolder();
     } catch (error) {
-      setMessage({ text: error instanceof Error ? error.message : "无法打开数据目录", error: true });
+      if (request === session.current.id) setMessage({ text: error instanceof Error ? error.message : "无法打开数据目录", error: true });
     }
   };
 
