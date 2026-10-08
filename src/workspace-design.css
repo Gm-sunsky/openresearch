@@ -1,5 +1,5 @@
 /* Research workspace: restrained graphite / warm paper, with one coral accent. */
-.app-workspace { font-size: 13px; }
+.app-workspace { font-size: 13px; min-height: 0; }
 .sidebar { width: 232px; background: var(--surface-secondary); color: var(--text-secondary); border-right: 1px solid var(--border); }
 .sidebar [class*="text-white"] { color: var(--text-muted); }
 .sidebar-brand { height: 84px; padding: 0 24px; gap: 11px; }

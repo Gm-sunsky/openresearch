@@ -30,6 +30,7 @@ app.whenReady().then(async () => {
     win.setSize(1080,680);await until('innerWidth<1100');await shot('redesign-minimum-dark.png');
     assert(await run('document.querySelector(".workspace-header").getBoundingClientRect().right<=innerWidth'), 'Header must fit the minimum desktop width');
     assert(await run('document.querySelector(".inspector").getBoundingClientRect().right<=innerWidth'), 'Inspector must fit the minimum desktop width');
+    assert(await run('document.querySelector(".sidebar-footer").getBoundingClientRect().bottom<=innerHeight+1'), 'Sidebar footer must stay fully visible inside the minimum window');
     assert.equal(errors.length,0,JSON.stringify(errors));fs.writeFileSync(path.join(output,'redesign-ui.json'),JSON.stringify({dark:true,light:true,reader:true,allTextRetained:true,errors},null,2));console.log('PASS: dark/light workspaces and full reader render without errors');
   } catch(error) { console.error(error);console.log(errors);console.log(await run('document.body.innerText.slice(0,1400)'));process.exitCode=1; } finally {win.destroy();app.exit(process.exitCode||0);}
 });

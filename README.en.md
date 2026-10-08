@@ -4,9 +4,9 @@
 
 [Download](https://github.com/Gm-sunsky/openresearch/releases/latest) · [Report an issue](https://github.com/Gm-sunsky/openresearch/issues)
 
-OpenResearch is a local-first AI research workspace for Windows and macOS. Describe a topic, discover sources, and organize evidence on a persistent research board. Current version: **1.6.0**.
+OpenResearch is a local-first AI research workspace for Windows and macOS. Describe a topic, discover sources, and organize evidence on a persistent research board. Current version: **1.6.1**.
 
-Version 1.6.0 implements the approved UI: graphite/warm-white system themes, project automation indicators, layered board tools, a clear inspector, and a contents/article/gallery reader. Existing data, packs, scheduling, and input fixes are preserved. See [release notes](docs/RELEASE_NOTES_V1_6_0.md).
+Version 1.6.1 implements the approved UI: graphite/warm-white system themes, project automation indicators, layered board tools, a clear inspector, and a contents/article/gallery reader. Existing data, packs, scheduling, and input fixes are preserved. See [release notes](docs/RELEASE_NOTES_V1_6_1.md).
 
 ## Features
 
