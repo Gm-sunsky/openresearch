@@ -2,7 +2,7 @@ import path from "node:path";
 import { existsSync } from "node:fs";
 import { app, BrowserWindow, net, safeStorage, powerMonitor } from "electron";
 import { IPC_CHANNELS } from "../../src/shared/contracts";
-import { StartupService } from "./startup";
+import { StartupService, usesBuiltRenderer } from "./startup";
 import { AiApiClient } from "./ai-client";
 import { ApiSettingsService, type SecretProtector } from "./api-settings";
 import { ResearchDatabase } from "./database";
@@ -50,7 +50,7 @@ function createMainWindow(): BrowserWindow {
     if (!url.startsWith("http://127.0.0.1:5173")) event.preventDefault();
   });
 
-  if (app.isPackaged) {
+  if (usesBuiltRenderer(app.isPackaged, process.argv)) {
     void window.loadFile(path.join(__dirname, "../../../dist/index.html"));
   } else {
     void window.loadURL("http://127.0.0.1:5173");
@@ -78,7 +78,12 @@ async function startApplication(): Promise<void> {
   scheduler = new ProjectScheduler(database, feeds, discovery, settings, () => {
     for (const window of BrowserWindow.getAllWindows()) window.webContents.send(IPC_CHANNELS.updatesChanged);
   });
-  registerIpcHandlers(database, feeds, settings, ai, discovery, new StartupService(app));
+  const applicationPath = app.getAppPath();
+  const startup = new StartupService(app, process.platform, process.execPath, "OpenResearch", {
+    appPath: applicationPath,
+    buildReady: () => existsSync(path.join(applicationPath, "dist/index.html")) && existsSync(path.join(applicationPath, "dist-electron/electron/main/index.js")),
+  });
+  registerIpcHandlers(database, feeds, settings, ai, discovery, startup);
   scheduler.start();
   powerMonitor.on("resume", checkAfterResume);
   createMainWindow();

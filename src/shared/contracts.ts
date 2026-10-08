@@ -293,6 +293,7 @@ export interface StartupSettings {
   enabled: boolean;
   supported: boolean;
   requiresApproval: boolean;
+  unavailableReason?: "development" | "platform" | "browser" | "build";
 }
 
 export interface ResearchBoardApi {

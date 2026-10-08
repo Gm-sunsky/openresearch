@@ -11,14 +11,80 @@ let host: HTMLDivElement, root: ReturnType<typeof createRoot>;
 beforeEach(() => { Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true }); vi.resetAllMocks(); translation.t = key => key; host = document.createElement("div"); document.body.append(host); root = createRoot(host); });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
 const state = { enabled: false, supported: true, requiresApproval: false };
+it("shows loading until the system answers and lets failed reads retry", async () => {
+  let finish!: (value: typeof state) => void;
+  mock.get.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  await act(async () => root.render(createElement(StartupControl)));
+  expect(host.textContent).toContain("startupLoading");
+  expect(host.querySelector<HTMLInputElement>("input")!.disabled).toBe(true);
+  await act(async () => finish(state));
+  mock.get.mockRejectedValueOnce(new Error("Read refused"));
+  await act(async () => window.dispatchEvent(new Event("focus")));
+  expect(host.querySelector('[role="alert"]')!.textContent).toContain("Read refused");
+  mock.get.mockResolvedValue({ ...state, enabled: true });
+  await act(async () => host.querySelector<HTMLButtonElement>("button")!.click());
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+  expect(host.textContent).toContain("startupEnabled");
+});
+it("shows the operation being saved and rereads the OS after a rejected write", async () => {
+  mock.get.mockResolvedValue(state);
+  let fail!: (error: Error) => void;
+  mock.set.mockImplementation(() => new Promise((_resolve, reject) => { fail = reject; }));
+  await act(async () => root.render(createElement(StartupControl)));
+  await act(async () => host.querySelector<HTMLInputElement>("input")!.click());
+  expect(host.textContent).toContain("startupEnabling");
+  mock.get.mockResolvedValue({ ...state, enabled: true });
+  await act(async () => fail(new Error("Verification failed")));
+  expect(host.querySelector<HTMLInputElement>("input")!.checked).toBe(true);
+  expect(host.textContent).toContain("startupEnabled");
+  expect(host.querySelector('[role="alert"]')!.textContent).toContain("Verification failed");
+});
+it("clears the stale value and warns when write recovery cannot read it", async () => {
+  mock.get.mockResolvedValue({ ...state, enabled: true });
+  mock.set.mockRejectedValue(new Error("Write failed"));
+  await act(async () => root.render(createElement(StartupControl)));
+  mock.get.mockRejectedValue(new Error("Read failed"));
+  await act(async () => host.querySelector<HTMLInputElement>("input")!.click());
+  expect(host.querySelector<HTMLInputElement>("input")!.checked).toBe(false);
+  expect(host.querySelector<HTMLInputElement>("input")!.disabled).toBe(true);
+  expect(host.querySelector('[role="status"]')!.textContent).toBe("startupReadFailed");
+  expect(host.textContent).toContain("startupStateUnknown");
+});
+it("never presents cached enabled status as current after a failed refresh", async () => {
+  mock.get.mockResolvedValue({ ...state, enabled: true });
+  await act(async () => root.render(createElement(StartupControl)));
+  expect(host.querySelector<HTMLInputElement>("input")!.checked).toBe(true);
+  mock.get.mockRejectedValue(new Error("Cannot read current status"));
+  await act(async () => window.dispatchEvent(new Event("focus")));
+  expect(host.querySelector<HTMLInputElement>("input")!.checked).toBe(false);
+  expect(host.querySelector('[role="status"]')!.textContent).toBe("startupReadFailed");
+  expect(host.querySelector('[role="alert"]')!.textContent).toContain("Cannot read current status");
+});
+it("lets users cancel a pending system approval request", async () => {
+  mock.get.mockResolvedValue({ ...state, requiresApproval: true });
+  mock.set.mockResolvedValue(state);
+  await act(async () => root.render(createElement(StartupControl)));
+  expect(host.querySelector<HTMLInputElement>("input")!.indeterminate).toBe(true);
+  await act(async () => host.querySelector<HTMLInputElement>("input")!.click());
+  expect(mock.set).toHaveBeenCalledWith(false);
+  expect(host.querySelector<HTMLInputElement>("input")!.indeterminate).toBe(false);
+  expect(host.querySelector('[role="status"]')!.textContent).toBe("startupDisabled");
+});
+it("explains unavailable builds", async () => {
+  mock.get.mockResolvedValue({ ...state, supported: false, unavailableReason: "build" });
+  await act(async () => root.render(createElement(StartupControl)));
+  expect(host.textContent).toContain("startupBuildRequired");
+});
 it("saves startup immediately without saving API settings and reloads OS changes on focus", async () => {
   mock.get.mockResolvedValue(state); mock.set.mockResolvedValue({ ...state, enabled: true });
   await act(async () => root.render(createElement(StartupControl)));
   const checkbox = host.querySelector<HTMLInputElement>("input")!;
   await act(async () => checkbox.click());
   expect(mock.set).toHaveBeenCalledWith(true); expect(checkbox.checked).toBe(true);
+  expect(host.querySelector('[role="status"]')!.textContent).toBe("startupEnabled");
   await act(async () => window.dispatchEvent(new Event("focus")));
   expect(checkbox.checked).toBe(false);
+  expect(host.querySelector('[role="status"]')!.textContent).toBe("startupDisabled");
 });
 it("reports errors without falsely flipping the switch", async () => {
   mock.get.mockResolvedValue(state); mock.set.mockRejectedValue(new Error("System refused"));
@@ -33,6 +99,8 @@ it("disables the browser preview control and shows pending macOS approval", asyn
   mock.get.mockResolvedValue({ ...state, requiresApproval: true });
   await act(async () => window.dispatchEvent(new Event("focus")));
   expect(host.textContent).toContain("startupApproval");
+  expect(host.querySelector<HTMLInputElement>("input")!.checked).toBe(false);
+  expect(host.querySelector<HTMLInputElement>("input")!.indeterminate).toBe(true);
 });
 it("finishes a pending system write after language changes or focus returns", async () => {
   mock.get.mockResolvedValue(state);
@@ -57,4 +125,17 @@ it("keeps the sidebar and settings switches synchronized with distinct IDs", asy
   expect(sidebar.checked).toBe(true); expect(settings.checked).toBe(true);
   await act(async () => settings.click());
   expect(sidebar.checked).toBe(false); expect(settings.checked).toBe(false);
+});
+it("updates the surviving sidebar when the settings control closes before a system write completes", async () => {
+  let enabled = false;
+  let finish!: () => void;
+  mock.get.mockImplementation(async () => ({ ...state, enabled }));
+  mock.set.mockImplementation(() => new Promise(resolve => { finish = () => { enabled = true; resolve({ ...state, enabled }); }; }));
+  const sidebar = createElement(StartupControl, { compact: true, key: "sidebar" });
+  await act(async () => root.render([sidebar, createElement(StartupControl, { key: "settings" })]));
+  await act(async () => host.querySelector<HTMLInputElement>("#launch-at-login")!.click());
+  await act(async () => root.render([sidebar]));
+  await act(async () => finish());
+  expect(host.querySelector<HTMLInputElement>("#sidebar-launch-at-login")!.checked).toBe(true);
+  expect(host.querySelector('[role="status"]')!.textContent).toBe("startupEnabled");
 });

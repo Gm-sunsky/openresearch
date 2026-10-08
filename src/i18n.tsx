@@ -5,7 +5,8 @@ type Key = keyof typeof zh;
 type Dictionary = Record<Key, string>;
 
 const zh = {
-  startupLabel: "开机自启动", startupHint: "登录系统后启动 OpenResearch。开关立即保存。", startupApproval: "请在系统设置的登录项中允许 OpenResearch。", startupDesktopOnly: "仅 Windows / macOS 正式桌面版支持。", startupFailed: "无法修改系统自启动设置。", scheduledUpdatesHint: "勾选更新项目后，运行期间按项目设置的每小时、每天或每周频率自动更新。暂停或取消勾选即停止；重启或休眠恢复后补查到期项目。退出软件期间不执行任务。",
+  startupLoading: "正在读取系统自启动状态…", startupEnabled: "已开启 · 登录系统后自动启动", startupDisabled: "未开启 · 登录系统后不会自动启动", startupEnabling: "正在开启自启动…", startupDisabling: "正在关闭自启动…", startupReadFailed: "无法读取系统自启动状态", startupStateUnknown: "当前系统状态无法确认，请重试。", startupRetry: "重新读取", startupBuildRequired: "需要先构建或安装正式桌面版才能开启自启动。", startupInstallRequired: "请安装正式桌面版后开启自启动。",
+  startupLabel: "开机自启动", startupHint: "登录系统后启动 OpenResearch。开关立即保存。", startupApproval: "请在系统设置的登录项中允许 OpenResearch。", startupDesktopOnly: "当前运行方式不支持系统自启动，请使用 Windows / macOS 桌面程序。", startupFailed: "无法修改系统自启动设置。", scheduledUpdatesHint: "勾选更新项目后，运行期间按项目设置的每小时、每天或每周频率自动更新。暂停或取消勾选即停止；重启或休眠恢复后补查到期项目。退出软件期间不执行任务。",
   confirmationTitle: "确认操作", confirmDeletion: "确认删除",
   eventDate: "事件日期", eventDateHint: "留空时，时间线使用卡片创建日期。",
   boardView: "白板", timelineView: "时间线", newestFirst: "最新优先", oldestFirst: "最早优先", unknownDate: "日期未知", timelineHint: "按事件日期排列，未注明事件日期时使用创建日期。",
@@ -40,7 +41,8 @@ const zh = {
 } as const;
 
 const en: Dictionary = {
-  startupLabel: "Launch at login", startupHint: "Start OpenResearch when you sign in. Changes are saved immediately.", startupApproval: "Allow OpenResearch in your system's Login Items settings.", startupDesktopOnly: "Available in packaged Windows / macOS desktop apps.", startupFailed: "Unable to change the system login-item setting.", scheduledUpdatesHint: "Selected active projects update hourly, daily, or weekly while the app runs. Pause or deselect to stop. Startup and wake check overdue projects. Tasks do not run after quitting the app.",
+  startupLoading: "Reading system startup status…", startupEnabled: "Enabled · Starts when you sign in", startupDisabled: "Disabled · Does not start when you sign in", startupEnabling: "Enabling startup…", startupDisabling: "Disabling startup…", startupReadFailed: "Unable to read system startup status", startupStateUnknown: "The current system state is unknown. Please retry.", startupRetry: "Read again", startupBuildRequired: "Build or install the desktop app before enabling startup.", startupInstallRequired: "Install the packaged desktop app before enabling startup.",
+  startupLabel: "Launch at login", startupHint: "Start OpenResearch when you sign in. Changes are saved immediately.", startupApproval: "Allow OpenResearch in your system's Login Items settings.", startupDesktopOnly: "This mode cannot change system startup. Use the Windows / macOS desktop app.", startupFailed: "Unable to change the system login-item setting.", scheduledUpdatesHint: "Selected active projects update hourly, daily, or weekly while the app runs. Pause or deselect to stop. Startup and wake check overdue projects. Tasks do not run after quitting the app.",
   confirmationTitle: "Confirm action", confirmDeletion: "Delete",
   eventDate: "Event date", eventDateHint: "Leave blank to use the card creation date in the timeline.",
   boardView: "Board", timelineView: "Timeline", newestFirst: "Newest first", oldestFirst: "Oldest first", unknownDate: "Unknown date", timelineHint: "Ordered by event date, or creation date when no event date is available.",

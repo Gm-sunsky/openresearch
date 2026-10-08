@@ -379,7 +379,7 @@ const browserApi: ResearchBoardApi = {
     openDataFolder: async () => { throw new Error("请在桌面客户端中打开数据目录"); },
   },
   startup: {
-    get: async () => ({ enabled: false, supported: false, requiresApproval: false }),
+    get: async () => ({ enabled: false, supported: false, requiresApproval: false, unavailableReason: "browser" }),
     set: async () => { throw new Error("请在正式桌面客户端中设置自启动 / Use the packaged desktop app"); },
   },
 };
