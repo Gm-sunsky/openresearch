@@ -3,7 +3,7 @@ import { api } from "../api";
 import { useI18n } from "../i18n";
 import type { StartupSettings } from "../shared/contracts";
 
-export function StartupControl() {
+export function StartupControl({ compact = false }: { compact?: boolean }) {
   const { t } = useI18n();
   const [settings, setSettings] = useState<StartupSettings | null>(null);
   const [busy, setBusy] = useState(false);
@@ -24,7 +24,8 @@ export function StartupControl() {
     };
     refresh();
     window.addEventListener("focus", refresh);
-    return () => { window.removeEventListener("focus", refresh); };
+    window.addEventListener("openresearch-startup-changed", refresh);
+    return () => { window.removeEventListener("focus", refresh); window.removeEventListener("openresearch-startup-changed", refresh); };
   }, [t]);
 
   const toggle = async (enabled: boolean) => {
@@ -34,17 +35,18 @@ export function StartupControl() {
     try {
       const value = await api.startup.set(enabled);
       if (id === request.current) setSettings(value);
+      window.dispatchEvent(new Event("openresearch-startup-changed"));
     } catch (reason) {
       if (id === request.current) setError(reason instanceof Error ? reason.message : t("startupFailed"));
     } finally { saving.current = false; if (id === request.current) setBusy(false); }
   };
 
-  return <div className="mt-5 border-t border-black/[0.07] pt-4">
+  return <div className={compact ? "sidebar-startup" : "mt-5 border-t border-black/[0.07] pt-4"}>
     <label className="setting-toggle">
-      <input id="launch-at-login" type="checkbox" checked={Boolean(settings?.enabled || settings?.requiresApproval)} disabled={!settings?.supported || busy} onChange={event => void toggle(event.target.checked)} />
-      <span><strong>{t("startupLabel")}</strong><small>{t("startupHint")}</small></span>
+      <input id={compact ? "sidebar-launch-at-login" : "launch-at-login"} type="checkbox" checked={Boolean(settings?.enabled || settings?.requiresApproval)} disabled={!settings?.supported || busy} onChange={event => void toggle(event.target.checked)} />
+      <span><strong>{t("startupLabel")}</strong>{!compact && <small>{t("startupHint")}</small>}</span>
     </label>
     <p className="mt-2 text-[9px] leading-4 theme-text-secondary" role="status">{error || (busy ? t("saving") : settings?.requiresApproval ? t("startupApproval") : settings && !settings.supported ? t("startupDesktopOnly") : "")}</p>
-    <p className="mt-3 text-[9px] leading-4 theme-text-muted">{t("scheduledUpdatesHint")}</p>
+    {!compact && <p className="mt-3 text-[9px] leading-4 theme-text-muted">{t("scheduledUpdatesHint")}</p>}
   </div>;
 }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Card } from "../shared/contracts";
 import { filterCards, type CardFilter } from "../lib/card-filter";
 import { findPackingTarget, groupCardBundles } from "../lib/card-packs";
-import { PlusIcon } from "./Icons";
+import { PlusIcon, BoardIcon, ClockIcon, SearchIcon } from "./Icons";
 import { ResearchCard } from "./ResearchCard";
 import { useI18n } from "../i18n";
 import { activeUpdateBatch, buildUpdateBatchRegions } from "../lib/update-batches";
@@ -141,15 +141,17 @@ export function Board({ cards, loading, onMove, onResize, onAddNote, selectedCar
   };
   return (
     <section ref={scrollRef} className="board-scroll relative flex-1 overflow-auto" aria-label="项目信息白板" onScroll={(event) => setActiveBatchId(activeUpdateBatch(batchMarkers, event.currentTarget.scrollTop + 110))} onMouseDown={(event) => event.target === event.currentTarget && onSelect(null)}>
-      <div className="board-tools sticky top-4 z-30 ml-[90px] flex w-max items-center gap-2">
-        <div className="board-filter flex items-center gap-0.5">
-          <button type="button" className={view === "board" ? "selected" : ""} aria-pressed={view === "board"} onClick={() => setView("board")}>{t("boardView")}</button>
-          <button type="button" className={view === "timeline" ? "selected" : ""} aria-pressed={view === "timeline"} onClick={() => setView("timeline")}>{t("timelineView")}</button>
+      <div className="board-tools sticky top-0 z-30">
+        <div className="board-view-switch">
+          <button type="button" className={view === "board" ? "selected" : ""} aria-pressed={view === "board"} onClick={() => setView("board")}><BoardIcon className="h-4 w-4" />{t("boardView")}</button>
+          <button type="button" className={view === "timeline" ? "selected" : ""} aria-pressed={view === "timeline"} onClick={() => setView("timeline")}><ClockIcon className="h-4 w-4" />{t("timelineView")}</button>
         </div>
+        <div className="board-toolbar-bottom">
         <div className="board-filter flex items-center gap-0.5">
-          {filters.map((item) => <button className={filter === item.value ? "selected" : ""} type="button" key={item.value} onClick={() => setFilter(item.value)}>{t(item.label)}</button>)}
+          {filters.map((item) => <button className={filter === item.value ? "selected" : ""} aria-pressed={filter === item.value} type="button" key={item.value} onClick={() => setFilter(item.value)}>{t(item.label)}<span>{filterCards(cards, item.value, query).length}</span></button>)}
         </div>
-        <input className="board-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("searchCards")} aria-label={t("searchCards")} />
+        <label className="board-search-wrap"><SearchIcon className="h-3.5 w-3.5" /><input className="board-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("searchCards")} aria-label={t("searchCards")} /></label>
+        </div>
       </div>
       {view === "timeline" ? (loading ? <div className="timeline-view"><div className="loading-mark" /></div> : <Timeline cards={cards.filter((card) => matchedIds.has(card.id))} onOpen={(cardId) => setTimelineFocus({ cardId, requestId: --timelineRequestId.current })} />) : <>
       {nodeBatches.length > 0 && (
@@ -178,10 +180,6 @@ export function Board({ cards, loading, onMove, onResize, onAddNote, selectedCar
         </div>
       )}
       <div className="board-canvas relative min-w-[1100px]" style={{ height: canvasHeight }} onMouseDown={(event) => event.target === event.currentTarget && onSelect(null)}>
-        <div className="absolute left-8 top-7 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.14em] text-[#a4a197]">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#e15e45]" />
-          Research canvas
-        </div>
         {batchMarkers.map((batch) => <div className={`batch-marker ${activeBatchId === batch.id ? "active" : ""}`} data-update-batch={batch.id} style={{ top: Math.max(58, batch.y - 38) }} key={batch.id}><span>{t("updateBatch")}</span><time>{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(batch.at))}</time><small>{batch.cardCount}</small><i /></div>)}
         {loading ? (
           <div className="absolute inset-0 flex items-center justify-center">

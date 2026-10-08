@@ -1,22 +1,45 @@
-.card-reader-backdrop { position: fixed; inset: 0; z-index: 150; display: flex; align-items: center; justify-content: center; padding: 30px; background: rgb(0 0 0 / 45%); backdrop-filter: blur(5px); }
-.card-reader { width: min(920px, 100%); height: min(860px, calc(100vh - 60px)); display: flex; flex-direction: column; border: 1px solid var(--border, #ccc); border-radius: 16px; color: var(--text-primary, #30312e); background: var(--surface, #fafaf7); box-shadow: 0 24px 90px rgb(0 0 0 / 30%); overflow: hidden; }
-.card-reader-toolbar { display: flex; align-items: center; gap: 20px; padding: 14px 22px; border-bottom: 1px solid var(--border, #ddd); font-size: 13px; }
-.card-reader-toolbar > span { flex: 1; }
-.card-reader-toolbar nav { display: flex; align-items: center; gap: 12px; }
-.card-reader button { border: 1px solid var(--border, #ccc); border-radius: 6px; padding: 5px 12px; background: transparent; color: inherit; cursor: pointer; }
-.card-reader button:disabled { opacity: .35; cursor: default; }
-.card-reader :focus-visible { outline: 2px solid #e15e45; outline-offset: 3px; }
-.card-reader-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 36px 58px; }
-.card-reader h1 { font-size: 26px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
-.card-reader-meta { opacity: .6; font-size: 12px; margin: 12px 0 28px; }
-.card-reader-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.95; font-size: 15px; user-select: text; }
-.card-reader h2 { font-size: 16px; font-weight: 600; margin: 32px 0 16px; }
-.card-reader figure { margin: 20px 0; }
-.card-reader figure img { display: block; max-width: 100%; max-height: 640px; object-fit: contain; margin: auto; border-radius: 8px; }
-.card-reader figcaption { font-size: 12px; line-height: 1.7; padding: 12px 0; }
-.card-reader figcaption button { display: block; margin-top: 8px; }
-.card-reader-unverified { display: block; opacity: .65; }
-.card-reader-sources { display: flex; flex-direction: column; gap: 8px; align-items: start; }
-.card-reader-sources button { text-align: left; overflow-wrap: anywhere; max-width: 100%; }
-.card-reader-hint { font-size: 11px; opacity: .65; padding: 10px 22px; border-top: 1px solid var(--border, #ddd); }
-@media (max-width: 700px) { .card-reader-backdrop { padding: 12px; } .card-reader { height: calc(100vh - 24px); } .card-reader-scroll { padding: 24px; } }
+.card-reader-backdrop { position:fixed; inset:0; z-index:150; display:flex; align-items:center; justify-content:center; padding:28px; background:rgb(0 0 0 / 54%); backdrop-filter:blur(7px); }
+.card-reader { width:min(1320px,100%); height:min(890px,calc(100vh - 56px)); display:flex; flex-direction:column; border:1px solid var(--border); border-radius:14px; color:var(--text-primary); background:var(--surface); box-shadow:0 28px 100px rgb(0 0 0 / 35%); overflow:hidden; }
+.card-reader-toolbar { display:flex; align-items:center; gap:18px; padding:13px 20px; border-bottom:1px solid var(--border); font-size:12px; background:var(--surface-muted,var(--surface)); }
+.card-reader-brand { flex:1; display:flex; align-items:center; gap:10px; font-weight:600; }
+.card-reader-brand small { border-left:1px solid var(--border); padding-left:10px; color:var(--text-secondary); font-size:11px; font-weight:400; }
+.card-reader-brand-mark { width:15px; height:15px; border:3px solid var(--accent,#ee7657); border-radius:50%; }
+.card-reader-toolbar nav { display:flex; align-items:center; gap:12px; }
+.card-reader button { border:1px solid var(--border); border-radius:6px; padding:5px 12px; background:transparent; color:inherit; cursor:pointer; font:inherit; }
+.card-reader button:hover { background:var(--surface-hover,var(--surface-muted)); }
+.card-reader button:disabled { opacity:.35; cursor:default; }
+.card-reader :focus-visible { outline:2px solid var(--accent,#ee7657); outline-offset:3px; }
+.card-reader-layout { display:grid; grid-template-columns:170px minmax(0,1fr) 270px; flex:1; min-height:0; }
+.card-reader-contents { padding:25px 14px; border-right:1px solid var(--border); background:var(--surface-muted,var(--surface)); }
+.card-reader-contents h2 { margin:0 10px 17px; font-size:11px; color:var(--text-secondary); font-weight:500; }
+.card-reader-contents button { display:flex; justify-content:space-between; align-items:center; width:100%; border:0; border-radius:6px; padding:11px 12px; margin-bottom:5px; text-align:left; font-size:12px; }
+.card-reader-contents .card-reader-section-active { background:color-mix(in srgb,var(--accent,#ee7657) 14%,transparent); border-left:2px solid var(--accent,#ee7657); }
+.card-reader-contents button span,.card-reader-images h2 span { font-size:10px; padding:1px 6px; border-radius:20px; background:var(--surface-hover,var(--border)); color:var(--text-secondary); }
+.card-reader-contents > p { white-space:pre-line; font-size:10px; line-height:1.9; color:var(--text-secondary); margin:30px 10px 0; }
+.card-reader-scroll { min-height:0; overflow:auto; overscroll-behavior:contain; padding:34px 40px; background:var(--surface); }
+.card-reader h1 { margin:0; font-size:25px; font-weight:650; line-height:1.45; letter-spacing:-.4px; overflow-wrap:anywhere; }
+.card-reader-meta { display:flex; flex-wrap:wrap; gap:7px 15px; color:var(--text-secondary); font-size:11px; margin:14px 0 25px; }
+.card-reader-summary { border-left:2px solid var(--accent,#ee7657); margin:0 0 26px; padding:10px 16px; font-size:14px; line-height:1.85; color:var(--text-secondary); background:var(--surface-muted,var(--surface)); white-space:pre-wrap; overflow-wrap:anywhere; }
+.card-reader-text { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.95; font-size:14px; user-select:text; }
+.card-reader h2 { font-size:13px; font-weight:600; margin:30px 0 15px; }
+.card-reader figure { margin:0 0 20px; }
+.card-reader figure img { display:block; width:100%; max-height:540px; object-fit:contain; margin:auto; border-radius:8px; background:var(--surface-muted,var(--surface)); }
+.card-reader-core-image { margin-top:26px; }
+.card-reader figcaption { font-size:11px; line-height:1.7; padding:9px 0; color:var(--text-secondary); overflow-wrap:anywhere; }
+.card-reader figcaption p { margin:0 0 5px; }
+.card-reader figcaption button { display:block; margin-top:8px; font-size:10px; }
+.card-reader-unverified { display:block; padding:5px 8px; border-radius:5px; background:var(--surface-muted,var(--surface)); font-size:10px; }
+.card-reader-images { min-height:0; overflow:auto; overscroll-behavior:contain; padding:24px 17px; border-left:1px solid var(--border); background:var(--surface-muted,var(--surface)); }
+.card-reader-images h2 { margin:0 0 19px; display:flex; justify-content:space-between; align-items:center; }
+.card-reader-images .card-reader-core-link { font-size:10px; margin-bottom:18px; width:100%; text-align:left; color:var(--text-secondary); }
+.card-reader-image-empty { font-size:12px; line-height:1.8; color:var(--text-secondary); }
+.card-reader-sources { display:flex; flex-direction:column; gap:8px; margin-top:30px; padding-top:4px; border-top:1px solid var(--border); }
+.card-reader-sources h2 { margin:20px 0 9px; }
+.card-reader-sources button { display:flex; align-items:center; gap:12px; text-align:left; overflow-wrap:anywhere; width:100%; padding:12px; }
+.card-reader-sources button > span:nth-child(2) { flex:1; min-width:0; font-size:12px; }
+.card-reader-sources small { display:block; margin-top:4px; color:var(--text-secondary); font-size:10px; }
+.card-reader-sources > p { color:var(--text-secondary); font-size:12px; }
+.card-reader-hint { font-size:10px; color:var(--text-secondary); padding:10px 20px; border-top:1px solid var(--border); background:var(--surface-muted,var(--surface)); }
+@media (max-width:1150px) { .card-reader-layout { grid-template-columns:135px minmax(0,1fr) 220px; } .card-reader-scroll { padding:28px; } .card-reader h1 { font-size:23px; } }
+@media (max-width:850px) { .card-reader-layout { grid-template-columns:110px minmax(0,1fr); } .card-reader-images { grid-column:2; max-height:230px; border-top:1px solid var(--border); } .card-reader-images figure { display:inline-block; vertical-align:top; width:calc(50% - 10px); margin-right:10px; } }
+@media (max-width:600px) { .card-reader-backdrop { padding:10px; } .card-reader { height:calc(100vh - 20px); } .card-reader-layout { grid-template-columns:minmax(0,1fr); } .card-reader-contents { display:none; } .card-reader-images { grid-column:1; } .card-reader-scroll { padding:22px; } .card-reader-brand small { display:none; } .card-reader-toolbar { gap:10px; padding:12px; } }

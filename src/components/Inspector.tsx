@@ -34,6 +34,8 @@ interface InspectorProps {
   onAcceptCandidate(candidateId: string): Promise<void>;
   onDismissCandidate(candidateId: string): Promise<void>;
   onOpenSettings(): void;
+  onOpenProjectSettings?(): void;
+  onToggleProject?(): void;
   onResolveChange(changeId: string): void;
   onJumpToChange(change: InformationChange): void;
 }
@@ -58,10 +60,17 @@ export function Inspector({
   onAcceptCandidate,
   onDismissCandidate,
   onOpenSettings,
+  onOpenProjectSettings,
+  onToggleProject,
   onResolveChange,
   onJumpToChange,
 }: InspectorProps) {
   const { t, locale } = useI18n();
+  const chinese = locale.startsWith("zh");
+  const latestTask = taskRuns.reduce<TaskRun | null>((latest, run) => !latest || new Date(run.startedAt).getTime() > new Date(latest.startedAt).getTime() ? run : latest, null);
+  const taskStatusLabel = (status: TaskRun["status"]) => chinese
+    ? ({ completed: "完成", partial: "部分完成", failed: "失败", running: "运行中" }[status])
+    : ({ completed: "Completed", partial: "Partially completed", failed: "Failed", running: "Running" }[status]);
   const [openingData, setOpeningData] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -113,7 +122,7 @@ export function Inspector({
   };
 
   return (
-    <aside className="inspector flex h-full w-[306px] shrink-0 flex-col overflow-y-auto border-l border-black/[0.07] bg-[#f7f5f0]">
+    <aside className="inspector project-inspector flex h-full w-[306px] shrink-0 flex-col overflow-y-auto border-l border-black/[0.07] bg-[#f7f5f0]">
       {cardForm && (
         <section className="card-editor border-b border-black/[0.07] px-5 py-5">
           <div className="flex items-center justify-between">
@@ -146,6 +155,56 @@ export function Inspector({
           </div>
         </section>
       )}
+      <section className="inspector-project-section border-b border-black/[0.07] px-5 py-5">
+        <div className="inspector-section-title"><p className="inspector-heading">{chinese ? "当前项目" : "Current project"}</p><button type="button" className="small-icon-button" aria-label={t("projectSettings")} onClick={onOpenProjectSettings}><ChevronIcon className="h-3.5 w-3.5" /></button></div>
+        <dl className="project-summary-list"><div><dt>{chinese ? "项目名称" : "Name"}</dt><dd>{project.name}</dd></div><div><dt>{chinese ? "项目描述" : "Description"}</dt><dd>{project.description || project.goal}</dd></div></dl>
+        <details className="project-goal-details"><summary className="inspector-subheading">{t("projectGoal")}</summary>
+        <p className="mt-3 text-[12px] leading-[1.7] theme-text-secondary">{project.goal}</p>
+        <div className="mt-4 flex flex-wrap gap-1.5">
+          {project.focus.map((item) => <span className="inspector-tag" key={item}>{item}</span>)}
+        </div>
+        </details>
+      </section>
+
+      <section className="inspector-automation-section border-b border-black/[0.07] px-5 py-5">
+        <p className="inspector-heading">{chinese ? "更新设置" : "Update settings"}</p>
+        <button className="project-frequency-control" type="button" onClick={onOpenProjectSettings}>{frequencyLabel(project.updateFrequency, locale)} · {chinese ? (project.updateSelected && project.status === "active" ? "自动更新" : "未启用自动更新") : (project.updateSelected && project.status === "active" ? "Automatic updates" : "Automatic updates off")}<ChevronIcon className="h-3.5 w-3.5" /></button>
+        <p className="inspector-frequency-hint">{chinese ? "软件运行时按频率检查已勾选项目" : "Selected projects are checked while the app runs"}</p>
+      </section>
+      <section className="inspector-work-section border-b border-black/[0.07] px-5 py-5">
+        <p className="inspector-heading">{t("workStatus")}</p>
+        <div className="latest-task-status mt-3">
+          {latestTask ? <>
+            <div className="flex items-center justify-between gap-2"><span className="text-[10px] theme-text-secondary">{latestTask.kind === "discovery" ? (chinese ? "来源发现" : "Source discovery") : (chinese ? "信息更新" : "Information update")}</span><span className={`task-status ${latestTask.status}`}>{taskStatusLabel(latestTask.status)}</span></div>
+            <p className="mt-1 text-[9px] theme-text-muted"><time dateTime={latestTask.finishedAt ?? latestTask.startedAt}>{new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(latestTask.finishedAt ?? latestTask.startedAt))}</time></p>
+          </> : <p className="text-[10px] theme-text-muted">{t("noTasks")}</p>}
+        </div>
+        <dl className="mt-3"><div className="flex items-center justify-between"><dt className="text-[10px] theme-text-secondary">{t("dataLocation")}</dt><dd><button className="data-folder-link" type="button" title={t("openDataFolder")} aria-label={t("openDataFolder")} disabled={openingData} onClick={() => void openDataFolder()}>{openingData ? t("openingDataFolder") : t("thisDevice")} <ExternalIcon className="h-3 w-3" /></button></dd></div></dl>
+        <details className="inspector-monitoring mt-3">
+          <summary className="inspector-heading">{chinese ? "项目监控" : "Project monitoring"}</summary>
+          <dl className="mt-3 space-y-3">
+            <div className="flex items-center justify-between"><dt className="text-[10px] theme-text-secondary">{chinese ? "项目监测" : "Monitoring"}</dt><dd><button className={`status-badge ${project.status}`} type="button" onClick={onToggleProject} title={t("projectSettings")}><span className={`h-1.5 w-1.5 rounded-full ${project.status === "active" ? "bg-[#5d8468]" : "bg-[#aaa79e]"}`} />{project.status === "active" ? t("active") : t("paused")}</button></dd></div>
+            <div className="flex items-center justify-between"><dt className="text-[10px] theme-text-secondary">{t("cardCount")}</dt><dd className="text-[10px] font-medium theme-text-primary">{project.cardCount}</dd></div>
+          </dl>
+        </details>
+        {dataError && <p className="data-folder-error" role="alert">{dataError}</p>}
+        <details className="inspector-recent-tasks mt-4">
+          <summary className="inspector-heading">{t("recentTasks")}</summary>
+          <div className="mt-3 space-y-2">
+            {taskRuns.length === 0 && <p className="text-[9px] leading-4 theme-text-muted">{t("noTasks")}</p>}
+            {taskRuns.slice(0, 5).map((run) => (
+              <article className="task-run" key={run.id} title={[...run.errors, ...run.warnings].join("\n")}>
+                <div className="flex items-center justify-between gap-2">
+                  <strong>{run.kind === "discovery" ? "来源发现" : "信息检查"}</strong>
+                  <span className={`task-status ${run.status}`}>{run.status === "completed" ? "完成" : run.status === "partial" ? "部分完成" : run.status === "failed" ? "失败" : "运行中"}</span>
+                </div>
+                <p>{run.summary ?? (run.errors[0] || "任务执行完成")}</p>
+                <small>{formatRelativeTime(run.finishedAt ?? run.startedAt, locale)}</small>
+              </article>
+            ))}
+          </div>
+        </details>
+      </section>
       <section className="change-center border-b border-black/[0.07] px-5 py-5">
         <div className="flex items-center justify-between">
           <p className="inspector-heading">{t("changesTitle")}</p>
@@ -164,19 +223,11 @@ export function Inspector({
           ))}
         </div>
       </section>
-      <section className="border-b border-black/[0.07] px-5 py-5">
-        <p className="inspector-heading">{t("projectGoal")}</p>
-        <p className="mt-3 text-[12px] leading-[1.7] theme-text-secondary">{project.goal}</p>
-        <div className="mt-4 flex flex-wrap gap-1.5">
-          {project.focus.map((item) => <span className="inspector-tag" key={item}>{item}</span>)}
-        </div>
-      </section>
-
-      <section className="border-b border-black/[0.07] px-5 py-5">
+      <section className="inspector-evidence-section border-b border-black/[0.07] px-5 py-5">
         <div className="flex items-center justify-between">
           <div>
-            <p className="inspector-heading">{t("sources")}</p>
-            <p className="mt-1 text-[9px] theme-text-muted">{sources.length} · {frequencyLabel(project.updateFrequency, locale)}</p>
+            <p className="inspector-heading">{chinese ? "证据与来源" : "Evidence & sources"} ({sources.length})</p>
+
           </div>
           <div className="flex items-center gap-1.5">
             <button className="discover-button" type="button" disabled={discovering} onClick={onDiscover}>
@@ -256,6 +307,7 @@ export function Inspector({
                 <p className="mt-0.5 truncate text-[9px] theme-text-muted">{sourcePlatformLabel(source.platform)}{source.type === "search" ? ` · ${t("searchSource")}` : ""} · {formatRelativeTime(source.lastCheckedAt, locale)}</p>
                 {source.lastError && <p className="mt-1 truncate text-[9px] text-[#bf4937]">{source.lastError}</p>}
               </div>
+              <button className="source-open" type="button" aria-label={chinese ? `打开来源：${source.name}` : `Open source: ${source.name}`} title={source.url} onClick={() => void api.links.open(source.url)}><ExternalIcon className="h-3.5 w-3.5" /></button>
               <button className="source-action opacity-0 group-hover:opacity-100" type="button" onClick={() => void (source.status === "error" ? onRetrySource(source) : onToggleSource(source))}>
                 {source.status === "error" ? t("retry") : source.status === "paused" ? t("resume") : t("pause")}
               </button>
@@ -267,31 +319,7 @@ export function Inspector({
         </div>
       </section>
 
-      <section className="px-5 py-5">
-        <p className="inspector-heading">{t("workStatus")}</p>
-        <dl className="mt-4 space-y-3">
-          <div className="flex items-center justify-between"><dt className="text-[10px] theme-text-secondary">Agent</dt><dd className="flex items-center gap-1.5 text-[10px] font-medium theme-text-primary"><span className={`h-1.5 w-1.5 rounded-full ${project.status === "active" ? "bg-[#5d8468]" : "bg-[#aaa79e]"}`} />{project.status === "active" ? "运行中" : "已暂停"}</dd></div>
-          <div className="flex items-center justify-between"><dt className="text-[10px] theme-text-secondary">{t("cardCount")}</dt><dd className="text-[10px] font-medium theme-text-primary">{project.cardCount}</dd></div>
-          <div className="flex items-center justify-between"><dt className="text-[10px] theme-text-secondary">{t("dataLocation")}</dt><dd><button className="data-folder-link" type="button" title={t("openDataFolder")} aria-label={t("openDataFolder")} disabled={openingData} onClick={() => void openDataFolder()}>{openingData ? t("openingDataFolder") : t("thisDevice")} <ExternalIcon className="h-3 w-3" /></button></dd></div>
-        </dl>
-        {dataError && <p className="data-folder-error" role="alert">{dataError}</p>}
-        <div className="mt-5 border-t border-black/[0.06] pt-4">
-          <p className="inspector-heading">{t("recentTasks")}</p>
-          <div className="mt-3 space-y-2">
-            {taskRuns.length === 0 && <p className="text-[9px] leading-4 theme-text-muted">{t("noTasks")}</p>}
-            {taskRuns.slice(0, 5).map((run) => (
-              <article className="task-run" key={run.id} title={[...run.errors, ...run.warnings].join("\n")}>
-                <div className="flex items-center justify-between gap-2">
-                  <strong>{run.kind === "discovery" ? "来源发现" : "信息检查"}</strong>
-                  <span className={`task-status ${run.status}`}>{run.status === "completed" ? "完成" : run.status === "partial" ? "部分完成" : run.status === "failed" ? "失败" : "运行中"}</span>
-                </div>
-                <p>{run.summary ?? (run.errors[0] || "任务执行完成")}</p>
-                <small>{formatRelativeTime(run.finishedAt ?? run.startedAt, locale)}</small>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
+
 
     </aside>
   );

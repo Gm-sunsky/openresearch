@@ -7,11 +7,10 @@ import { CardReader } from "./components/CardReader";
 import { groupCardBundles } from "./lib/card-packs";
 import { CreateProjectDialog } from "./components/CreateProjectDialog";
 import { Inspector } from "./components/Inspector";
-import { ChevronIcon, MoreIcon, PlusIcon, RefreshIcon, SparkIcon } from "./components/Icons";
+import { MoreIcon, PlusIcon, RefreshIcon, SparkIcon } from "./components/Icons";
 import { ProjectSidebar } from "./components/ProjectSidebar";
 import { ProjectSettingsDialog } from "./components/ProjectSettingsDialog";
 import { SettingsDialog } from "./components/SettingsDialog";
-import { informationDepthPolicy } from "./shared/information-depth";
 import { frequencyLabel } from "./lib/format";
 import type { AiSettings, Card, CreateSourceInput, InformationChange, Project, Source, SourceCandidate, TaskRun, UpdateCardInput, UpdateProjectInput } from "./shared/contracts";
 import { useI18n } from "./i18n";
@@ -412,21 +411,21 @@ export default function App() {
         onSettings={() => setSettingsOpen(true)}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="workspace-main flex min-w-0 flex-1 flex-col">
         {project ? (
           <>
             <header className="workspace-header flex h-[72px] shrink-0 items-center justify-between border-b border-black/[0.07] px-6">
-              <div className="min-w-0">
-                <div className="flex items-center gap-1 text-[9px] font-medium uppercase tracking-[0.13em] theme-text-muted">
-                  {t("projects")} <ChevronIcon className="h-3 w-3" /> {t("activeBoard")}
+              <div className="workspace-project-heading min-w-0">
+                <div className="workspace-title-row flex items-center gap-3">
+                  <h1 className="truncate text-[22px] font-semibold tracking-[-0.035em] theme-text-primary">{project.name}</h1>
+                  <button className={`automation-chip ${project.updateSelected && project.status === "active" ? "enabled" : ""}`} type="button" onClick={() => setProjectSettingsOpen(true)} title={t("projectSettings")}>
+                    <span className="automation-indicator" aria-hidden="true">{project.updateSelected && project.status === "active" ? "✓" : "−"}</span>
+                    {locale.startsWith("zh") ? (project.updateSelected ? project.status === "active" ? "已选自动更新" : "自动更新已暂停" : "未选自动更新") : (project.updateSelected ? project.status === "active" ? "Auto-update selected" : "Auto-update paused" : "Auto-update not selected")} · {frequencyLabel(project.updateFrequency, locale)}
+                  </button>
                 </div>
-                <div className="mt-1.5 flex items-center gap-3">
-                  <h1 className="truncate text-[19px] font-semibold tracking-[-0.035em] theme-text-primary">{project.name}</h1>
-                  <button className={`status-badge ${project.status}`} type="button" onClick={() => void toggleProject()} title={t("projectSettings")}><span />{project.status === "active" ? t("active") : t("paused")}</button>
-                </div>
+                <p className="workspace-project-description mt-1.5 truncate text-[12px] theme-text-secondary">{project.description || project.goal}</p>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="mr-2 hidden text-[10px] theme-text-secondary xl:block">{informationDepthPolicy(project.informationDepth).label} · {project.updateSelected ? "已选更新 · " + frequencyLabel(project.updateFrequency, locale) : "未选更新"}</span>
+              <div className="workspace-header-actions flex items-center gap-2">
                 <button className="secondary-button" type="button" onClick={addNote}><PlusIcon className="h-3.5 w-3.5" />{t("newCard")}</button>
                 <button className="primary-button" type="button" disabled={selectionSaving || !readyForUpdate.length} onClick={() => void runUpdate()} title="只更新侧栏中勾选的项目，查看项目不会改变勾选">
                   <RefreshIcon className={"h-3.5 w-3.5 " + (updatingIds.size ? "animate-spin" : "")} />{readyForUpdate.length ? "更新选中项目（" + readyForUpdate.length + "）" : updatingIds.size ? "更新中（" + updatingIds.size + "）" : "请勾选更新项目"}
@@ -435,7 +434,7 @@ export default function App() {
               </div>
             </header>
 
-            <div className="flex min-h-0 flex-1">
+            <div className="workspace-body flex min-h-0 flex-1">
               <Board
                 cards={cards}
                 loading={loading}
@@ -472,6 +471,8 @@ export default function App() {
                 onAcceptCandidate={acceptCandidate}
                 onDismissCandidate={dismissCandidate}
                 onOpenSettings={() => setSettingsOpen(true)}
+                onOpenProjectSettings={() => setProjectSettingsOpen(true)}
+                onToggleProject={() => void toggleProject()}
                 onResolveChange={(changeId) => void resolveChange(changeId)}
                 onJumpToChange={jumpToChange}
               />

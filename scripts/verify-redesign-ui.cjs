@@ -1,0 +1,35 @@
+const { app, BrowserWindow, nativeTheme } = require('electron');
+const fs = require('node:fs'); const path = require('node:path'); const assert = require('node:assert/strict');
+const root = path.resolve(__dirname, '..'), output = path.join(root, 'docs', 'verification');
+app.setPath('userData', path.join(root, 'tmp', 'redesign-ui-profile'));
+app.whenReady().then(async () => {
+  const win = new BrowserWindow({ width: 1440, height: 1000, show: false, webPreferences: { nodeIntegration: false, contextIsolation: true, backgroundThrottling: false } });
+  const run = source => win.webContents.executeJavaScript(source);
+  const until = async source => { for (let i=0;i<160;i++) { if (await run(source)) return; await new Promise(resolve=>setTimeout(resolve,50)); } throw Error('Timed out: '+source); };
+  const shot = async name => { win.webContents.invalidate(); await new Promise(resolve=>setTimeout(resolve,250)); await win.webContents.capturePage();win.webContents.invalidate(); await new Promise(resolve=>setTimeout(resolve,250)); fs.writeFileSync(path.join(output,name),(await win.webContents.capturePage()).toPNG()); };
+  const errors = [];win.webContents.on('console-message',e=>{if(e.level===3)errors.push(e.message);});
+  try {
+    const fixture = path.join(root, 'tmp', 'material-ui'); fs.mkdirSync(fixture,{recursive:true});
+    fs.writeFileSync(path.join(fixture,'poster.svg'),'<svg xmlns="http://www.w3.org/2000/svg" width="900" height="500"><rect width="900" height="500" fill="#ddd7ca"/><text x="60" y="120" font-size="40" fill="#343931">资料验证用票务示意</text><text x="60" y="230" font-size="54" fill="#343931">10月8日 18:00</text><text x="60" y="340" font-size="34" fill="#343931">大阪城 Hall · 开票公告</text></svg>');
+    fs.writeFileSync(path.join(fixture,'unknown.svg'),'<svg xmlns="http://www.w3.org/2000/svg" width="900" height="400"><rect width="900" height="400" fill="#445b68"/><circle cx="450" cy="180" r="100" fill="#b9d1d9"/><text x="260" y="340" font-size="36" fill="white">未附说明的搜集图片</text></svg>');
+    fs.mkdirSync(output,{recursive:true});nativeTheme.themeSource='dark';await win.loadURL('http://127.0.0.1:5178');await win.webContents.insertCSS('* {animation:none!important;transition:none!important;}');
+    await until('document.querySelector("[data-card-id=demo-1]")');
+    await run(`(async()=>{const {api}=await import(performance.getEntriesByType('resource').find(e=>new URL(e.name).pathname==='/src/api.ts').name);const p=(await api.projects.list())[0];for(const name of ['AI研究进展','城市公共活动'])await api.projects.create({prompt:name,name,draft:{name,description:'持续整理可信信息',goal:name,focus:['官方公告'],updateFrequency:'daily'}});await api.updates.select([p.id]);const cards=await api.cards.list(p.id);for(const c of cards){c.updateBatchId='demo-batch';c.updateBatchAt=p.updatedAt;if(c.id==='demo-1'||c.id==='demo-5'){c.position={x:80,y:100};c.size={width:340,height:245};c.imageUrl=null;c.images=[];}if(c.id==='demo-2'){c.position={x:450,y:100};c.size={width:340,height:245};}if(c.id==='demo-3'){c.position={x:80,y:375};c.size={width:340,height:250};}if(c.id==='demo-4'){c.position={x:450,y:375};c.size={width:340,height:250};}}})()`);
+    await run("[...document.querySelectorAll('button')].find(b=>b.textContent.includes('新建卡片')).click()");await until('document.querySelector(".card-editor")');
+    await run(`(async()=>{const {api}=await import(performance.getEntriesByType('resource').find(e=>new URL(e.name).pathname==='/src/api.ts').name);api.startup={get:async()=>({enabled:false,supported:true,requiresApproval:false}),set:async enabled=>({enabled,supported:true,requiresApproval:false})};window.dispatchEvent(new Event('openresearch-startup-changed'));const c=(await api.cards.list('browser-demo')).find(c=>c.id==='demo-3');c.title='公演与售票资料';c.summary='官方公演公告与票务说明集中保存，尚未公布的日期继续等待确认。';c.content=c.summary;c.images=[{url:location.origin+'/tmp/material-ui/poster.svg',caption:'桌面验证用票务示意，非真实公告',relevance:'relevant',sourceUrl:'https://example.com/tickets'}];c.imageUrl=c.images[0].url;})()`);
+    await run(`(async()=>{const {api}=await import(performance.getEntriesByType('resource').find(e=>new URL(e.name).pathname==='/src/api.ts').name);const note=(await api.cards.list('browser-demo')).find(c=>c.title==='新的研究笔记');await api.cards.remove(note.id);})()`);
+    await run("[...document.querySelectorAll('.card-editor button')].find(b=>b.textContent==='关闭').click()");await run('document.querySelector(".source-action").click()');
+    await until('document.querySelector("[data-card-id=demo-1]").style!==null');
+    await shot('redesign-board-dark.png');
+    nativeTheme.themeSource='light';await until("!matchMedia('(prefers-color-scheme: dark)').matches");await shot('redesign-board-light.png');
+    await run(`(async()=>{const {api}=await import(performance.getEntriesByType('resource').find(e=>new URL(e.name).pathname==='/src/api.ts').name);const c=(await api.cards.list('browser-demo')).find(c=>c.id==='demo-1');c.summary='大阪追加公演已公布；会员先行抽选已经开放，一般售票时间仍待确认。';c.content='大阪城 Hall 追加公演已经官方确认。会员先行抽选本周开放，一般售票日期仍待官方后续公布。\\n\\n资料窗口完整保存整理文字和引用来源，可将最新公告与此前的票务信息交叉核对，区分已确认事实与待确认事项。\\n\\n以下图片为桌面验证用示意。未附文字说明的图片保留在旁边的图片栏，标注相关性待确认，不进入研究卡片预览。';c.images=[{url:location.origin+'/tmp/material-ui/poster.svg',caption:'桌面验证用票务示意，非真实公告',relevance:'relevant',sourceUrl:'https://example.com/tickets'},{url:location.origin+'/tmp/material-ui/unknown.svg',caption:null,relevance:'unverified'}];})()`);
+    await run('document.querySelector(".source-action").click()');await run('document.querySelector("[data-card-id=demo-1]").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))');await until('document.querySelector(".card-reader")');await shot('redesign-reader-light.png');
+    assert((await run('document.querySelector(".card-reader-text").textContent')).includes('大阪城'));assert(await run('document.querySelector("#root").inert'));
+    nativeTheme.themeSource='dark';await until("matchMedia('(prefers-color-scheme: dark)').matches");await shot('redesign-reader-dark.png');
+    await run("document.querySelector('.card-reader button[aria-label=\"关闭资料窗口\"]').click()");await until('!document.querySelector(".card-reader")');
+    win.setSize(1080,680);await until('innerWidth<1100');await shot('redesign-minimum-dark.png');
+    assert(await run('document.querySelector(".workspace-header").getBoundingClientRect().right<=innerWidth'), 'Header must fit the minimum desktop width');
+    assert(await run('document.querySelector(".inspector").getBoundingClientRect().right<=innerWidth'), 'Inspector must fit the minimum desktop width');
+    assert.equal(errors.length,0,JSON.stringify(errors));fs.writeFileSync(path.join(output,'redesign-ui.json'),JSON.stringify({dark:true,light:true,reader:true,allTextRetained:true,errors},null,2));console.log('PASS: dark/light workspaces and full reader render without errors');
+  } catch(error) { console.error(error);console.log(errors);console.log(await run('document.body.innerText.slice(0,1400)'));process.exitCode=1; } finally {win.destroy();app.exit(process.exitCode||0);}
+});

@@ -46,3 +46,15 @@ it("finishes a pending system write after language changes or focus returns", as
   const checkbox = host.querySelector<HTMLInputElement>("input")!;
   expect(checkbox.checked).toBe(true); expect(checkbox.disabled).toBe(false);
 });
+it("keeps the sidebar and settings switches synchronized with distinct IDs", async () => {
+  let enabled = false;
+  mock.get.mockImplementation(async () => ({ ...state, enabled }));
+  mock.set.mockImplementation(async value => ({ ...state, enabled: enabled = value }));
+  await act(async () => root.render([createElement(StartupControl, { compact: true, key: "sidebar" }), createElement(StartupControl, { key: "settings" })]));
+  const sidebar = host.querySelector<HTMLInputElement>("#sidebar-launch-at-login")!;
+  const settings = host.querySelector<HTMLInputElement>("#launch-at-login")!;
+  await act(async () => sidebar.click());
+  expect(sidebar.checked).toBe(true); expect(settings.checked).toBe(true);
+  await act(async () => settings.click());
+  expect(sidebar.checked).toBe(false); expect(settings.checked).toBe(false);
+});

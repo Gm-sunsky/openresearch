@@ -71,3 +71,59 @@ it("keeps keyboard navigation working after clicking the last page button", asyn
     expect(document.querySelector(".card-reader h1")!.textContent).toBe(card.title);
   } finally { await act(async () => root.unmount()); container.remove(); }
 });
+
+it("provides a contents rail and retains source provenance when only a primary link exists", async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  const scrollIntoView = vi.fn();
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scrollIntoView });
+  const container = document.createElement("div"); document.body.append(container); const root = createRoot(container);
+  const material = { ...card, sourceUrl: "https://example.com/report", sourceName: "Original report" };
+  try {
+    await act(async () => root.render(createElement(CardReader, { card: material, cards: [material], onNavigate: vi.fn(), onClose: vi.fn() })));
+    const rail = document.querySelector(".card-reader-contents")!;
+    expect(rail.querySelectorAll("button")).toHaveLength(4);
+    await act(async () => [...rail.querySelectorAll("button")].find(button => button.textContent?.startsWith("Sources"))!.click());
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+    expect(document.querySelector(".card-reader-sources")?.textContent).toContain("https://example.com/report");
+    expect(document.querySelector(".card-reader-summary")?.textContent).toBe(card.summary);
+    expect(document.querySelector(".card-reader-core-image img")?.getAttribute("src")).toBe(card.imageUrl);
+    expect(document.querySelector(".card-reader-images img")?.getAttribute("src")).toBe("https://example.com/extra.png");
+    await act(async () => document.querySelector<HTMLButtonElement>(".card-reader-core-link")!.click());
+    expect(scrollIntoView.mock.contexts.at(-1)).toBe(document.querySelector(".card-reader-core-image"));
+    expect(document.activeElement).toBe(document.querySelector(".card-reader-scroll"));
+  } finally { await act(async () => root.unmount()); container.remove(); }
+});
+
+it("routes image arrow scrolling to the gallery and resets the current contents item on page changes", async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  Object.defineProperty(HTMLElement.prototype, "scrollBy", { configurable: true, value: vi.fn() });
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
+  const container = document.createElement("div"); document.body.append(container); const root = createRoot(container);
+  const second = { ...card, id: "second", title: "Second material" };
+  function Fixture() {
+    const [current, setCurrent] = useState(card.id);
+    return createElement(CardReader, { card: current === card.id ? { ...card, sourceName: "0 sources" } : second, cards: [card, second], onNavigate: setCurrent, onClose: vi.fn() });
+  }
+  try {
+    await act(async () => root.render(createElement(Fixture)));
+    const article = document.querySelector<HTMLElement>(".card-reader-scroll")!;
+    const gallery = document.querySelector<HTMLElement>(".card-reader-images")!;
+    const articleScroll = vi.fn(); const galleryScroll = vi.fn();
+    Object.defineProperty(article, "scrollBy", { configurable: true, value: articleScroll });
+    Object.defineProperty(gallery, "scrollBy", { configurable: true, value: galleryScroll });
+    const rail = document.querySelector(".card-reader-contents")!;
+    expect(document.querySelector(".card-reader-meta")?.textContent).toBe("0 sources");
+    await act(async () => [...rail.querySelectorAll("button")].find(button => button.textContent?.startsWith("Images"))!.click());
+    expect(rail.querySelector("[aria-current='location']")?.textContent).toBe("Images2");
+    expect(document.activeElement).toBe(gallery);
+    await act(async () => gallery.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true })));
+    expect(galleryScroll).toHaveBeenCalledWith({ top: 100, behavior: "smooth" });
+    expect(articleScroll).not.toHaveBeenCalled();
+    article.focus();
+    await act(async () => article.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true, cancelable: true })));
+    expect(articleScroll).toHaveBeenCalledWith({ top: -100, behavior: "smooth" });
+    await act(async () => gallery.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true })));
+    expect(rail.querySelector("[aria-current='location']")?.textContent).toBe("Overview");
+    expect(document.activeElement).toBe(article);
+  } finally { await act(async () => root.unmount()); container.remove(); }
+});

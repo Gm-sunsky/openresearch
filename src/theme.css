@@ -1,32 +1,40 @@
 /* Shared surfaces keep every card type consistent and follow OS appearance live. */
 :root {
   color-scheme: light dark;
-  --background: #f1efe9;
-  --board-background: #efede7;
-  --surface: #fbfaf6;
-  --surface-secondary: #f7f5f0;
-  --surface-hover: #eeece5;
-  --text-primary: #252620;
-  --text-secondary: #5f605a;
-  --text-muted: #817f76;
-  --border: rgba(36, 37, 33, .13);
-  --dot: rgba(56, 57, 52, .13);
-  --accent: #d6533c;
+  --background: #f7f6f2;
+  --board-background: #f3f2ee;
+  --surface: #fdfcf9;
+  --surface-secondary: #f7f6f2;
+  --surface-muted: #eeede8;
+  --surface-hover: #eeede8;
+  --text-primary: #262b31;
+  --text-secondary: #616872;
+  --text-muted: #858b94;
+  --border: rgba(38, 43, 49, .12);
+  --dot: rgba(38, 43, 49, .10);
+  --accent: #d95e44;
+  --accent-soft: rgba(217, 94, 68, .10);
+  --success: #5a806c;
+  --card-shadow: 0 2px 5px rgb(30 35 40 / 3%);
   --danger: #bf4937;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #191b19;
-    --board-background: #1d201d;
-    --surface: #292d29;
-    --surface-secondary: #232623;
-    --surface-hover: #343a34;
-    --text-primary: #eeeFEa;
-    --text-secondary: #bec3b9;
-    --text-muted: #949c90;
-    --border: rgba(222, 231, 217, .15);
-    --dot: rgba(198, 211, 190, .13);
-    --accent: #f2866e;
+    --background: #191c20;
+    --board-background: #1b1f23;
+    --surface: #24282e;
+    --surface-secondary: #1e2227;
+    --surface-muted: #292e35;
+    --surface-hover: #2d333b;
+    --text-primary: #f1f1ee;
+    --text-secondary: #bbc1ca;
+    --text-muted: #88919d;
+    --border: rgba(224, 230, 239, .12);
+    --dot: rgba(204, 216, 230, .12);
+    --accent: #ec775f;
+    --accent-soft: rgba(236, 119, 95, .12);
+    --success: #91c4a4;
+    --card-shadow: 0 3px 8px rgb(0 0 0 / 9%);
     --danger: #f29685;
   }
 }

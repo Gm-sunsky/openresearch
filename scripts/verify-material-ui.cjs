@@ -28,7 +28,7 @@ app.whenReady().then(async()=>{
     await screenshot('material-preview-light.png');
     await run('document.querySelector("[data-card-id=\\\"demo-1\\\"]").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))');await until('document.querySelector(".card-reader")');
     assert.equal(await run('document.querySelector(".card-reader-text").textContent'),full);
-    assert.equal(await run('document.querySelectorAll(".card-reader-images img").length'),2);
+    assert.equal(await run('document.querySelectorAll(".card-reader img").length'),2);
     assert.equal(await run('document.querySelectorAll(".card-reader-unverified").length'),1);
     assert(await run('document.querySelector("#root").inert'));
     await screenshot('material-reader-light.png');
