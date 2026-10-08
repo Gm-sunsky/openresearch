@@ -289,7 +289,17 @@ export interface BackupResult {
   sizeBytes: number;
 }
 
+export interface StartupSettings {
+  enabled: boolean;
+  supported: boolean;
+  requiresApproval: boolean;
+}
+
 export interface ResearchBoardApi {
+  startup: {
+    get(): Promise<StartupSettings>;
+    set(enabled: boolean): Promise<StartupSettings>;
+  };
   projects: {
     list(): Promise<Project[]>;
     create(input: CreateProjectInput): Promise<Project>;
@@ -326,6 +336,7 @@ export interface ResearchBoardApi {
     test(input: SaveAiSettingsInput): Promise<ApiConnectionResult>;
   };
   updates: {
+    onChanged(listener: () => void): () => void;
     select(projectIds: string[]): Promise<Project[]>;
     run(projectId: string): Promise<UpdateRunResult>;
     history(projectId: string): Promise<TaskRun[]>;
@@ -344,6 +355,9 @@ export interface ResearchBoardApi {
 }
 
 export const IPC_CHANNELS = {
+  startupGet: "startup:get",
+  startupSet: "startup:set",
+  updatesChanged: "updates:changed",
   projectsList: "projects:list",
   projectsCreate: "projects:create",
   projectsRemove: "projects:remove",

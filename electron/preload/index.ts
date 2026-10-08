@@ -4,6 +4,9 @@ import type { ResearchBoardApi } from "../../src/shared/contracts";
 // Sandboxed Electron preload scripts cannot require arbitrary local modules.
 // Keep runtime channel names self-contained so the compiled preload only loads Electron.
 const IPC_CHANNELS = {
+  startupGet: "startup:get",
+  startupSet: "startup:set",
+  updatesChanged: "updates:changed",
   projectsList: "projects:list",
   projectsCreate: "projects:create",
   projectsRemove: "projects:remove",
@@ -40,6 +43,10 @@ const IPC_CHANNELS = {
 } as const;
 
 const api: ResearchBoardApi = {
+  startup: {
+    get: () => ipcRenderer.invoke(IPC_CHANNELS.startupGet),
+    set: (enabled) => ipcRenderer.invoke(IPC_CHANNELS.startupSet, enabled),
+  },
   projects: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.projectsList),
     create: (input) => ipcRenderer.invoke(IPC_CHANNELS.projectsCreate, input),
@@ -76,6 +83,11 @@ const api: ResearchBoardApi = {
     test: (input) => ipcRenderer.invoke(IPC_CHANNELS.settingsTest, input),
   },
   updates: {
+    onChanged: (listener) => {
+      const changed = () => listener();
+      ipcRenderer.on(IPC_CHANNELS.updatesChanged, changed);
+      return () => { ipcRenderer.removeListener(IPC_CHANNELS.updatesChanged, changed); };
+    },
     select: (projectIds) => ipcRenderer.invoke(IPC_CHANNELS.updatesSelect, projectIds),
     run: (projectId) => ipcRenderer.invoke(IPC_CHANNELS.updatesRun, projectId),
     history: (projectId) => ipcRenderer.invoke(IPC_CHANNELS.updatesHistory, projectId),

@@ -21,6 +21,7 @@ import type {
 import { IPC_CHANNELS } from "../../src/shared/contracts";
 import { AiApiClient } from "./ai-client";
 import { ApiSettingsService } from "./api-settings";
+import type { StartupService } from "./startup";
 import { ResearchDatabase } from "./database";
 import { FeedService } from "./feed-service";
 import { generateProjectDraft } from "./project-generator";
@@ -236,7 +237,13 @@ export function registerIpcHandlers(
   settings: ApiSettingsService,
   ai: AiApiClient,
   discovery: SourceDiscoveryAgent,
+  startup?: StartupService,
 ): void {
+  ipcMain.handle(IPC_CHANNELS.startupGet, () => startup?.get() ?? { enabled: false, supported: false, requiresApproval: false });
+  ipcMain.handle(IPC_CHANNELS.startupSet, (_event, enabled: unknown) => {
+    if (typeof enabled !== "boolean" || !startup) throw new Error("自启动开关参数无效 / Invalid startup setting");
+    return startup.set(enabled);
+  });
   const resolveProjectDraft = async (input: CreateProjectInput): Promise<ProjectDraft> => {
     const fallback = generateProjectDraft(input);
     if (input.draft) return { ...input.draft, name: input.name?.trim() || input.draft.name };

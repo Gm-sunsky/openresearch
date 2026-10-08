@@ -17,9 +17,18 @@ export function isSourceDue(source: Source, now = Date.now()): boolean {
 }
 
 export function isDiscoveryDue(project: Project, runs: TaskRun[], now = Date.now()): boolean {
-  const latest = runs.find((run) => run.kind === "discovery");
-  if (!latest) return true;
-  return now - new Date(latest.startedAt).getTime() >= FREQUENCY_MS[project.updateFrequency];
+  return isTaskDue(project, runs, "discovery", now);
+}
+
+export function isProjectUpdateDue(project: Project, runs: TaskRun[], now = Date.now()): boolean {
+  return isTaskDue(project, runs, "update", now);
+}
+
+function isTaskDue(project: Project, runs: TaskRun[], kind: TaskRun["kind"], now: number): boolean {
+  const timestamps = runs.filter((run) => run.kind === kind)
+    .map((run) => Date.parse(run.startedAt)).filter(Number.isFinite);
+  // Count failed and manual attempts too, avoiding retries every minute after a failure.
+  return timestamps.length === 0 || now - Math.max(...timestamps) >= FREQUENCY_MS[project.updateFrequency];
 }
 
 export class ProjectScheduler {
@@ -33,6 +42,7 @@ export class ProjectScheduler {
     private readonly feeds: FeedService,
     private readonly discovery?: SourceDiscoveryAgent,
     private readonly settings?: ApiSettingsService,
+    private readonly onChanged?: () => void,
   ) {}
 
   start(): void {
@@ -40,7 +50,7 @@ export class ProjectScheduler {
     const run = () => void this.checkDueProjects().catch((error) => console.error("Scheduled check failed", error));
     this.startupTimer = setTimeout(run, 5_000);
     this.startupTimer.unref();
-    this.timer = setInterval(run, 60 * 60 * 1_000);
+    this.timer = setInterval(run, 60 * 1_000);
     this.timer.unref();
   }
 
@@ -62,26 +72,48 @@ export class ProjectScheduler {
         if (generation !== this.generation) break;
         const project = this.database.getProject(selected.id);
         if (!project || project.status !== "active" || project.updateSelected !== true) continue;
+        if (!isProjectUpdateDue(project, this.taskHistory(project.id, "update"))) continue;
         const sources = this.database.listSources(project.id);
-        if (sources.length === 0 && this.discovery && this.settings?.get().autoDiscoverSources && isDiscoveryDue(project, this.database.listTaskRuns(project.id))) {
+        if (sources.length === 0 && this.discovery && this.settings?.get().autoDiscoverSources && isDiscoveryDue(project, this.taskHistory(project.id, "discovery"))) {
           try {
             await this.discovery.run(project.id);
           } catch (error) {
             console.error(`Scheduled source discovery failed for project ${project.id}`, error);
+          } finally {
+            this.notifyChanged();
           }
         }
         // A user can change the selection while discovery is awaiting the network.
         const current = this.database.getProject(project.id);
         if (generation !== this.generation || !current || current.status !== "active" || current.updateSelected !== true) continue;
-        if (!this.database.listSources(project.id).some((source) => isSourceDue(source))) continue;
+        // Re-read task history: a manual update may have started while discovery awaited the network.
+        if (!isProjectUpdateDue(current, this.taskHistory(project.id, "update"))) continue;
         try {
           await this.feeds.runProject(project.id);
         } catch (error) {
           console.error(`Scheduled update failed for project ${project.id}`, error);
+        } finally {
+          this.notifyChanged();
         }
       }
     } finally {
       this.checking = false;
     }
+  }
+
+  private notifyChanged(): void {
+    try {
+      this.onChanged?.();
+    } catch (error) {
+      console.error("Scheduled update notification failed", error);
+    }
+  }
+
+  private taskHistory(projectId: string, kind: TaskRun["kind"]): TaskRun[] {
+    if (typeof this.database.getLatestTaskRun === "function") {
+      const latest = this.database.getLatestTaskRun(projectId, kind);
+      return latest ? [latest] : [];
+    }
+    return this.database.listTaskRuns(projectId, 100);
   }
 }

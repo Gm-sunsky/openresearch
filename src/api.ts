@@ -346,6 +346,7 @@ const browserApi: ResearchBoardApi = {
     test: async () => { throw new Error("网页预览模式不连接 API，请在桌面客户端中测试连接"); },
   },
   updates: {
+    onChanged: () => () => {},
     select: async (projectIds) => {
       if (!Array.isArray(projectIds) || projectIds.some((id) => typeof id !== "string" || !projects.some((project) => project.id === id))) throw new Error("选中的项目不存在");
       const selected = new Set(projectIds);
@@ -376,6 +377,10 @@ const browserApi: ResearchBoardApi = {
   maintenance: {
     createBackup: async () => ({ path: "浏览器预览/backup.sqlite", createdAt: new Date().toISOString(), sizeBytes: 0 }),
     openDataFolder: async () => { throw new Error("请在桌面客户端中打开数据目录"); },
+  },
+  startup: {
+    get: async () => ({ enabled: false, supported: false, requiresApproval: false }),
+    set: async () => { throw new Error("请在正式桌面客户端中设置自启动 / Use the packaged desktop app"); },
   },
 };
 

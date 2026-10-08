@@ -1011,7 +1011,16 @@ export class ResearchDatabase {
       ORDER BY started_at DESC
       LIMIT $limit
     `, { $projectId: projectId, $limit: Math.max(1, Math.min(100, limit)) })
-      .map((row) => ({
+      .map((row) => this.mapTaskRun(row));
+  }
+
+  getLatestTaskRun(projectId: string, kind: TaskKind): TaskRun | null {
+    const row = this.query("SELECT * FROM update_runs WHERE project_id = $projectId AND kind = $kind ORDER BY started_at DESC, id DESC LIMIT 1", { $projectId: projectId, $kind: kind })[0];
+    return row ? this.mapTaskRun(row) : null;
+  }
+
+  private mapTaskRun(row: Row): TaskRun {
+    return {
         id: asString(row.id),
         projectId: asString(row.project_id),
         kind: asString(row.kind) as TaskKind,
@@ -1023,7 +1032,7 @@ export class ResearchDatabase {
         errors: parseStringArray(row.error_json),
         warnings: parseStringArray(row.warning_json),
         summary: asNullableString(row.summary),
-      }));
+      };
   }
 
   private findCard(id: string): Card | null {

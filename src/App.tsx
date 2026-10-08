@@ -113,6 +113,12 @@ export default function App() {
     else setLoading(false);
   }, [selectedId, reloadProject]);
 
+  useEffect(() => api.updates.onChanged?.(() => {
+    void loadProjects().catch(() => {});
+    const projectId = selectedIdRef.current;
+    if (projectId) void reloadProject(projectId);
+  }), [loadProjects, reloadProject]);
+
   const toggleUpdateSelection = async (projectId: string, selected: boolean) => {
     if (selectionSavingRef.current) return;
     selectionSavingRef.current = true;

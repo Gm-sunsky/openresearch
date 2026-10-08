@@ -290,6 +290,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .modal-backdrop { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(24,25,23,.52); backdrop-filter: blur(5px); animation: fade-in .18s ease both; }
 .create-dialog { width: min(820px, calc(100vw - 80px)); overflow: hidden; border: 1px solid rgba(255,255,255,.22); border-radius: 13px; background: #fbfaf6; box-shadow: 0 30px 90px rgba(18,19,17,.28); animation: dialog-in .24s cubic-bezier(.2,.7,.25,1) both; }
 .settings-dialog { width: min(790px, calc(100vw - 80px)); overflow: hidden; border: 1px solid rgba(255,255,255,.22); border-radius: 13px; background: #fbfaf6; box-shadow: 0 30px 90px rgba(18,19,17,.28); animation: dialog-in .24s cubic-bezier(.2,.7,.25,1) both; }
+.settings-dialog { display: flex; max-height: calc(100vh - 48px); flex-direction: column; }
+.settings-dialog > header, .settings-dialog > footer { flex: none; }
+.settings-dialog > .grid { min-height: 0; overflow: auto; }
 .security-note { display: flex; align-items: flex-start; gap: 9px; border: 1px solid rgba(76,112,85,.12); border-radius: 8px; background: rgba(79,112,87,.045); padding: 11px; }
 .security-note strong { display: block; color: #56645a; font-size: 10px; font-weight: 650; }
 .security-note p { margin-top: 3px; color: #92978f; font-size: 8px; line-height: 1.55; }

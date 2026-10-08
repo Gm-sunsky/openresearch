@@ -13,7 +13,7 @@ vi.mock("../src/api", () => ({
     cards: { list: vi.fn() },
     sources: { list: vi.fn() },
     discovery: { list: vi.fn() },
-    updates: { select: vi.fn(), run: vi.fn(), history: vi.fn() },
+    updates: { select: vi.fn(), run: vi.fn(), history: vi.fn(), onChanged: vi.fn() },
     changes: { list: vi.fn() },
     settings: { get: vi.fn() },
   },
@@ -158,6 +158,17 @@ afterEach(async () => {
 });
 
 describe("project update selection", () => {
+  it("refreshes the visible board when a background scheduled update finishes and removes its subscription", async () => {
+    let changed!: () => void;
+    const unsubscribe = vi.fn();
+    vi.mocked(api.updates.onChanged).mockImplementation(listener => { changed = listener; return unsubscribe; });
+    await renderApp();
+    vi.mocked(api.cards.list).mockImplementation(async id => [{ ...card(id), title: "定时更新的新卡片" }]);
+    await act(async () => changed());
+    expect(element('[aria-label="项目信息白板"]').textContent).toContain("定时更新的新卡片");
+    await act(async () => root.render(null));
+    expect(unsubscribe).toHaveBeenCalled();
+  });
   it("persists checkboxes independently of the viewed project and runs exactly the checked set", async () => {
     await renderApp();
     await click(element('[aria-label="更新项目：项目 C"]'));

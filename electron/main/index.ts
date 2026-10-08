@@ -1,6 +1,8 @@
 import path from "node:path";
 import { existsSync } from "node:fs";
-import { app, BrowserWindow, net, safeStorage } from "electron";
+import { app, BrowserWindow, net, safeStorage, powerMonitor } from "electron";
+import { IPC_CHANNELS } from "../../src/shared/contracts";
+import { StartupService } from "./startup";
 import { AiApiClient } from "./ai-client";
 import { ApiSettingsService, type SecretProtector } from "./api-settings";
 import { ResearchDatabase } from "./database";
@@ -16,6 +18,13 @@ app.setPath("userData", legacyProfiles.find((directory) => existsSync(path.join(
 
 let database: ResearchDatabase | null = null;
 let scheduler: ProjectScheduler | null = null;
+const hasInstanceLock = app.requestSingleInstanceLock();
+app.on("second-instance", () => {
+  if (!database) return;
+  const window = BrowserWindow.getAllWindows()[0] ?? createMainWindow();
+  if (window.isMinimized()) window.restore();
+  window.show(); window.focus();
+});
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -66,13 +75,17 @@ async function startApplication(): Promise<void> {
   const ai = new AiApiClient(settings, chromiumFetch, app.getLocale(), loadResearchSkill(app.getAppPath()));
   const feeds = new FeedService(database, chromiumFetch, ai);
   const discovery = new SourceDiscoveryAgent(database, ai, settings, chromiumFetch);
-  scheduler = new ProjectScheduler(database, feeds, discovery, settings);
-  registerIpcHandlers(database, feeds, settings, ai, discovery);
+  scheduler = new ProjectScheduler(database, feeds, discovery, settings, () => {
+    for (const window of BrowserWindow.getAllWindows()) window.webContents.send(IPC_CHANNELS.updatesChanged);
+  });
+  registerIpcHandlers(database, feeds, settings, ai, discovery, new StartupService(app));
   scheduler.start();
+  powerMonitor.on("resume", checkAfterResume);
   createMainWindow();
 }
 
 app.whenReady().then(async () => {
+  if (!hasInstanceLock) { app.quit(); return; }
   await startApplication();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
@@ -87,8 +100,13 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  powerMonitor.removeListener("resume", checkAfterResume);
   scheduler?.stop();
   database?.close();
   scheduler = null;
   database = null;
 });
+
+function checkAfterResume(): void {
+  void scheduler?.checkDueProjects().catch(error => console.error("Wake update check failed", error));
+}

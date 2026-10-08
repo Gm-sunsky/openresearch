@@ -3,6 +3,7 @@ import { api } from "../api";
 import type { AiSettings, ApiProvider, ApiProtocol, SaveAiSettingsInput } from "../shared/contracts";
 import { CheckIcon, CloseIcon, KeyIcon, ShieldIcon } from "./Icons";
 import { useI18n } from "../i18n";
+import { StartupControl } from "./StartupControl";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -198,6 +199,7 @@ export function SettingsDialog({ open, settings, onClose, onSaved }: SettingsDia
               <div><strong>密钥留在此设备</strong><p>使用系统安全存储加密，不会发送到界面或写入日志。</p></div>
             </div>
             <p className="field-label mt-7">{t("automation")}</p>
+            <StartupControl />
             <label className="setting-toggle mt-3">
               <input type="checkbox" checked={form.autoDiscoverSources} onChange={(event) => setForm({ ...form, autoDiscoverSources: event.target.checked })} />
               <span><strong>创建项目后发现来源</strong><small>自动生成候选列表，仍由你确认。</small></span>
