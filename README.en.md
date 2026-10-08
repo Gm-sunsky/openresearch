@@ -4,9 +4,9 @@
 
 [Download](https://github.com/Gm-sunsky/openresearch/releases/latest) · [Report an issue](https://github.com/Gm-sunsky/openresearch/issues)
 
-OpenResearch is a local-first AI research workspace for Windows and macOS. Describe a topic, discover sources, and organize evidence on a persistent research board. Current version: **1.5.5**.
+OpenResearch is a local-first AI research workspace for Windows and macOS. Describe a topic, discover sources, and organize evidence on a persistent research board. Current version: **1.5.6**.
 
-Version 1.5.5 adds caption-based core-image selection, independent overviews, a full-material reader, and fixes for draft resets and stale pointer listeners. See [release notes](docs/RELEASE_NOTES_V1_5_5.md).
+Version 1.5.6 refines caption-based core-image selection, independent overviews, a full-material reader, and fixes for draft resets and stale pointer listeners. Large cards use available space and wheel input over packs only changes pages. See [release notes](docs/RELEASE_NOTES_V1_5_6.md).
 
 ## Features
 

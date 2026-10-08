@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type PointerEvent, type WheelEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from "react";
 import { api } from "../api";
 import { formatRelativeTime } from "../lib/format";
 import { cardContentLayout, resizeCardFrame, type ResizeEdge } from "../lib/card-resize";
 import type { Card } from "../shared/contracts";
+import { useCardTextLayout } from "../lib/use-card-text-layout";
 import { summarizeCard } from "../shared/card-presentation";
 import { AlertIcon, ExternalIcon, LockIcon, MoreIcon, SparkIcon, TrashIcon } from "./Icons";
 import { useI18n } from "../i18n";
@@ -94,6 +95,7 @@ export function ResearchCard({
   const resizeCleanup = useRef<(() => void) | null>(null);
   const longPressTimer = useRef<number | null>(null);
   const lastWheelAt = useRef(0);
+  const packRef = useRef<HTMLDivElement>(null);
   const packed = cardsInPack.length > 1 && Boolean(card.packId);
   const sourceLinks = card.sourceLinks.length
     ? card.sourceLinks
@@ -208,15 +210,29 @@ export function ResearchCard({
     if (wasDragging) cancelDrag.current?.();
   };
 
-  const switchWithWheel = (event: WheelEvent<HTMLElement>) => {
-    if (!packed || resizing || Math.max(Math.abs(event.deltaX), Math.abs(event.deltaY)) < 4) return;
-    event.preventDefault();
-    const now = Date.now();
-    if (now - lastWheelAt.current < 180) return;
-    lastWheelAt.current = now;
-    const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
-    onNavigate(activeIndex + (delta > 0 ? 1 : -1));
-  };
+  const wheelState = useRef({ packed, resizing, activeIndex, onNavigate });
+  wheelState.current = { packed, resizing, activeIndex, onNavigate };
+  useLayoutEffect(() => {
+    const element = packRef.current;
+    if (!element) return;
+    const wheel = (event: WheelEvent) => {
+      const current = wheelState.current;
+      if (!current.packed) return;
+      // React delegates wheel with passive listeners; cancellation must be native.
+      event.preventDefault();
+      event.stopPropagation();
+      const factor = event.deltaMode === 1 ? 20 : event.deltaMode === 2 ? element.clientHeight : 1;
+      const dx = event.deltaX * factor, dy = event.deltaY * factor;
+      if (current.resizing || Math.max(Math.abs(dx), Math.abs(dy)) < 4) return;
+      const now = Date.now();
+      if (now - lastWheelAt.current < 180) return;
+      lastWheelAt.current = now;
+      const delta = Math.abs(dx) > Math.abs(dy) ? dx : dy;
+      current.onNavigate(current.activeIndex + (delta > 0 ? 1 : -1));
+    };
+    element.addEventListener("wheel", wheel, { passive: false });
+    return () => element.removeEventListener("wheel", wheel);
+  }, []);
 
   const openSource = (url: string) => void api.links.open(url);
 
@@ -294,9 +310,11 @@ export function ResearchCard({
   };
 
   const layout = cardContentLayout(size, Boolean(previewImageUrl) && !currentImage?.failed, currentImage?.size);
+  const textLayout = useCardTextLayout({ layoutKey: JSON.stringify([card.id, card.title, card.sourceName, card.sourceUrl, locale]), content: card.content, overview: card.summary || summarizeCard(card.content), width: size.width, height: size.height, imageHeight: layout.imageHeight, compact: layout.compact, initialLines: layout.contentLines });
 
   return (
     <div
+      ref={packRef}
       className={`card-pack-shell ${dragging ? "dragging" : ""} ${resizing ? "resizing" : ""} ${dropTarget ? "drop-target" : ""}`}
       style={{
         transform: `translate3d(${position.x}px, ${position.y}px, 0) scale(${dropTarget ? 1.045 : 1})`,
@@ -306,6 +324,7 @@ export function ResearchCard({
     >
       {packed && <><span className="pack-sheet pack-sheet-back" /><span className="pack-sheet pack-sheet-mid" /></>}
       <article
+        ref={textLayout.articleRef}
         className={`research-card type-${card.type} change-${card.changeKind} ${dragging ? "dragging" : ""} ${resizing ? "resizing" : ""} ${selected ? "selected" : ""} ${highlighted ? "jump-target" : ""} ${packed ? "packed" : ""} ${layout.compact ? "compact" : ""} ${layout.showImage ? "has-image" : ""}`}
         data-card-id={card.id}
         onPointerDown={pointerDown}
@@ -313,7 +332,6 @@ export function ResearchCard({
         onPointerUp={finishPointer}
         onPointerCancel={cancelPointer}
         onLostPointerCapture={cancelPointer}
-        onWheel={switchWithWheel}
         onDoubleClick={(event) => {
           if (dragging || resizing || (event.target as HTMLElement).closest("button, a, [data-resize-handle]")) return;
           onOpen?.(card.id);
@@ -380,8 +398,8 @@ export function ResearchCard({
             </div>
           )}
           {!layout.compact && card.sourceUrl && <span className="card-summary-label">{t("coreInfo")}</span>}
-          {layout.contentLines > 0 && <p className="card-content whitespace-pre-line text-[12px] leading-[1.7] theme-text-secondary" style={{ WebkitLineClamp: layout.contentLines }}>{summarizeCard(card.summary || card.content, Math.max(12, Math.floor((size.width - 44) / 12) * layout.contentLines))}</p>}
-          <footer className="mt-auto flex items-end justify-between gap-3 pt-5">
+          <p ref={textLayout.textRef} data-text-mode={textLayout.expanded ? "full" : "overview"} data-visible-lines={textLayout.lines} className="card-content whitespace-pre-line text-[12px] leading-[1.7] theme-text-secondary" style={{ WebkitLineClamp: Math.max(1, textLayout.lines), maxHeight: textLayout.lines * textLayout.lineHeight }}>{textLayout.text}</p>
+          <footer ref={textLayout.footerRef} className="mt-auto flex items-end justify-between gap-3 pt-5">
             <div className="min-w-0">
               {card.sourceName && <p className="truncate text-[10px] font-medium theme-text-secondary">{card.sourceName}</p>}
               <p className="mt-0.5 text-[9px] theme-text-muted">{card.updateBatchAt ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(card.updateBatchAt)) : formatRelativeTime(card.occurredAt ?? card.createdAt, locale)}</p>

@@ -51,6 +51,15 @@ export function Board({ cards, loading, onMove, onResize, onAddNote, selectedCar
   const handledFocusRequest = useRef<number | null>(null);
   const highlightTimer = useRef<number | null>(null);
   const timelineRequestId = useRef(0);
+  useEffect(() => {
+    // Keep wheel input cancelable even when Chromium replaces a pack's contents.
+    const preventPackScroll = (event: WheelEvent) => {
+      const target = event.target;
+      if (target instanceof Element && scrollRef.current?.contains(target) && target.closest(".research-card.packed")) event.preventDefault();
+    };
+    document.addEventListener("wheel", preventPackScroll, { capture: true, passive: false });
+    return () => document.removeEventListener("wheel", preventPackScroll, true);
+  }, []);
   const matchedIds = useMemo(() => new Set(filterCards(cards, filter, query).map((card) => card.id)), [cards, filter, query]);
   const visibleBundles = useMemo(() => groupCardBundles(cards).filter((bundle) => bundle.cards.some((card) => matchedIds.has(card.id))), [cards, matchedIds]);
   const displayedCards = visibleBundles.map((bundle) => {
