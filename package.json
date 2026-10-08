@@ -1,6 +1,6 @@
 {
   "name": "openresearch",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "private": true,
   "description": "OpenResearch: local-first AI research workspace for Windows and macOS",
   "main": "dist-electron/electron/main/index.js",

@@ -110,7 +110,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .card-lock { background: rgba(72,92,71,.08); color: #627568; }
 .change-badge.updated { background: rgba(187,128,43,.1); color: #a4732e; }
 .change-badge.conflict { background: rgba(191,73,55,.1); color: #b84f3e; }
-.update-node-sticky { position: sticky; left: 0; top: 62px; z-index: 35; height: 0; width: 78px; pointer-events: none; }
+.update-node-sticky { position: sticky; left: 0; top: 62px; z-index: 20; height: 0; width: 78px; pointer-events: none; }
 .update-node-rail { position: relative; display: flex; max-height: calc(100vh - 190px); width: 76px; flex-direction: column; gap: 2px; overflow: auto; padding: 10px 7px 12px 12px; pointer-events: auto; scrollbar-width: none; }
 .update-node-rail::-webkit-scrollbar { display: none; }
 .update-node-line { position: absolute; left: 20px; top: 20px; bottom: 20px; width: 1px; background: linear-gradient(180deg, rgba(225,94,69,.28), rgba(68,68,61,.1) 34%, rgba(68,68,61,.04)); }
@@ -198,7 +198,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .source-popover > button:hover { background: rgba(225,94,69,.055); color: #d35740; }
 .source-popover > button span { overflow: hidden; font-size: 9px; font-weight: 620; text-overflow: ellipsis; white-space: nowrap; }
 .source-popover > button small { overflow: hidden; max-width: 82px; color: #aaa79e; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
-.board-tools { pointer-events: none; }
+.board-tools { pointer-events: auto; }
 .board-tools > * { pointer-events: auto; }
 .board-filter { border: 1px solid rgba(36,37,33,.09); border-radius: 7px; background: rgba(250,249,245,.86); padding: 2px; box-shadow: 0 2px 9px rgba(35,33,27,.04); backdrop-filter: blur(8px); }
 .board-filter button { height: 24px; border-radius: 5px; padding: 0 7px; color: #99978f; font-size: 8px; font-weight: 600; }
