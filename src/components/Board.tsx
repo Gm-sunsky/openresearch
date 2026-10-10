@@ -68,11 +68,11 @@ export function Board({ cards, loading, onMove, onResize, onAddNote, selectedCar
     return bundle.cards[matchingIndex >= 0 && !matchedIds.has(bundle.cards[savedIndex]?.id) ? matchingIndex : savedIndex];
   });
   const batchMarkers = useMemo(() => buildUpdateBatchRegions(cards), [cards]);
-  const nodeBatches = useMemo(() => [...batchMarkers].sort((left, right) => right.at.localeCompare(left.at)), [batchMarkers]);
+  const nodeBatches = useMemo(() => [...batchMarkers].sort((left, right) => Date.parse(left.at) - Date.parse(right.at)), [batchMarkers]);
   const canvasHeight = Math.max(900, ...cards.map((card) => card.position.y + card.size.height + 64));
 
   useEffect(() => {
-    const newest = nodeBatches[0]?.id ?? null;
+    const newest = nodeBatches.at(-1)?.id ?? null;
     if (view === "board" && previousNewestBatch.current && newest && previousNewestBatch.current !== newest) {
       const target = batchMarkers.find((batch) => batch.id === newest);
       window.requestAnimationFrame(() => scrollRef.current?.scrollTo({ top: Math.max(0, (target?.y ?? 0) - 82), behavior: "smooth" }));
@@ -140,7 +140,7 @@ export function Board({ cards, loading, onMove, onResize, onAddNote, selectedCar
     else onMove(cardId, position);
   };
   return (
-    <section ref={scrollRef} className="board-scroll relative flex-1 overflow-auto" aria-label="项目信息白板" onScroll={(event) => setActiveBatchId(activeUpdateBatch(batchMarkers, event.currentTarget.scrollTop + 110))} onMouseDown={(event) => event.target === event.currentTarget && onSelect(null)}>
+    <div className="board-workspace flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="board-tools sticky top-0 z-30">
         <div className="board-view-switch">
           <button type="button" className={view === "board" ? "selected" : ""} aria-pressed={view === "board"} onClick={() => setView("board")}><BoardIcon className="h-4 w-4" />{t("boardView")}</button>
@@ -153,32 +153,9 @@ export function Board({ cards, loading, onMove, onResize, onAddNote, selectedCar
         <label className="board-search-wrap"><SearchIcon className="h-3.5 w-3.5" /><input className="board-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("searchCards")} aria-label={t("searchCards")} /></label>
         </div>
       </div>
+      <div className="board-viewport relative min-h-0 flex-1">
+      <section ref={scrollRef} className="board-scroll relative h-full overflow-auto" aria-label="项目信息白板" onScroll={(event) => setActiveBatchId(activeUpdateBatch(batchMarkers, event.currentTarget.scrollTop + 110))} onMouseDown={(event) => event.target === event.currentTarget && onSelect(null)}>
       {view === "timeline" ? (loading ? <div className="timeline-view"><div className="loading-mark" /></div> : <Timeline cards={cards.filter((card) => matchedIds.has(card.id))} onOpen={(cardId) => setTimelineFocus({ cardId, requestId: --timelineRequestId.current })} />) : <>
-      {nodeBatches.length > 0 && (
-        <div className="update-node-sticky" aria-hidden={false}>
-          <nav className="update-node-rail" aria-label={t("updateNavigator")}>
-            <span className="update-node-line" aria-hidden="true" />
-            {nodeBatches.map((batch, index) => {
-              const date = new Date(batch.at);
-              return (
-                <button
-                  key={batch.id}
-                  type="button"
-                  className={`update-node ${activeBatchId === batch.id ? "active" : ""}`}
-                  onClick={() => jumpToBatch(batch.id)}
-                  title={`${t("jumpToUpdate")} · ${new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(date)}`}
-                >
-                  <span className="update-node-dot" />
-                  <span className="update-node-copy">
-                    <strong>{index === 0 ? t("latestBatch") : new Intl.DateTimeFormat(locale, { month: "2-digit", day: "2-digit" }).format(date)}</strong>
-                    <small>{new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(date)}</small>
-                  </span>
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-      )}
       <div className="board-canvas relative min-w-[1100px]" style={{ height: canvasHeight }} onMouseDown={(event) => event.target === event.currentTarget && onSelect(null)}>
         {batchMarkers.map((batch) => <div className={`batch-marker ${activeBatchId === batch.id ? "active" : ""}`} data-update-batch={batch.id} style={{ top: Math.max(58, batch.y - 38) }} key={batch.id}><span>{t("updateBatch")}</span><time>{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(batch.at))}</time><small>{batch.cardCount}</small><i /></div>)}
         {loading ? (
@@ -225,5 +202,27 @@ export function Board({ cards, loading, onMove, onResize, onAddNote, selectedCar
       </div>
       </>}
     </section>
+      {view === "board" && nodeBatches.length > 0 && (
+        <div className="update-node-fixed">
+          <nav className="update-node-rail" aria-label={t("updateNavigator")}>
+            {nodeBatches.map((batch, index) => {
+              const date = new Date(batch.at);
+              return <button key={batch.id} type="button" data-batch-id={batch.id}
+                className={`update-node ${activeBatchId === batch.id ? "active" : ""}`}
+                aria-current={activeBatchId === batch.id ? "step" : undefined}
+                onClick={() => jumpToBatch(batch.id)}
+                title={`${t("jumpToUpdate")} · ${new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(date)}`}>
+                <span className="update-node-dot" />
+                <span className="update-node-copy">
+                  <strong>{index === nodeBatches.length - 1 ? t("latestBatch") : new Intl.DateTimeFormat(locale, { month: "2-digit", day: "2-digit" }).format(date)}</strong>
+                  <small>{new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(date)}</small>
+                </span>
+              </button>;
+            })}
+          </nav>
+        </div>
+      )}
+      </div>
+    </div>
   );
 }
