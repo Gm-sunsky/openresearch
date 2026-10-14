@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AiApiClient } from "../electron/main/ai-client";
 import { ResearchDatabase } from "../electron/main/database";
 import { FeedService } from "../electron/main/feed-service";
@@ -186,7 +186,7 @@ describe("FeedService project agent", () => {
     expect(result.errors).toEqual([]);
     expect(result.warnings[0]).toMatch(/AI 综合整理失败，已保留来源提取结果并使用跨语言本地分类/);
     expect(database.listTaskRuns(project.id)[0]?.warnings).toHaveLength(1);
-    expect(database.listCards(project.id).filter((card) => card.sourceName === "交通公告")[0]?.content).toContain("reviewable local result");
+    expect(database.listCards(project.id).filter((card) => card.sourceName === "交通公告")[0]?.content).toContain("Open today");
     database.close();
   });
 
@@ -275,7 +275,7 @@ describe("FeedService project agent", () => {
     const result = await service.runProject(project.id);
     const card = database.listCards(project.id).find((item) => item.updateBatchId === result.runId);
     expect(result.errors[0]).toContain("HTTP 500");
-    expect(card?.content).toContain("本次没有采集到可读取的正文");
+    expect(card?.content).toContain("未知");
     expect(card?.content).not.toContain("当前来源未提供可确认的信息");
     database.close();
   });
@@ -307,5 +307,21 @@ it("keeps supplementary source images in the reader without using them as core p
     expect(card.imageUrl).toBe("https://primary.example/core.jpg");
     expect(card.sourceLinks).toHaveLength(1);
     expect(card.images).toContainEqual(expect.objectContaining({ url: "https://archive.example/unknown.jpg", relevance: "unverified", caption: null }));
+  } finally { database.close(); }
+});
+
+it("recovers a transient source abort and replaces the previous source error after success", async () => {
+  const ai = { shouldOrganizeContent: () => false } as AiApiClient;
+  const { database, project } = await setup(ai);
+  const source = database.listSources(project.id)[0];
+  database.updateSourceCheck(source.id, { status: "error", error: "The operation was aborted" });
+  const fetchImpl = vi.fn().mockRejectedValueOnce(new DOMException("The operation was aborted", "AbortError"))
+    .mockResolvedValueOnce(new Response('<rss><channel><item><title>独库公路开放</title><link>https://example.com/open</link><description>独库公路今天开放。</description></item></channel></rss>'));
+  try {
+    const result = await new FeedService(database, fetchImpl, ai).runProject(project.id);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(result.errors).toEqual([]);
+    expect(database.listSources(project.id)[0]).toMatchObject({ status: "active", lastError: null });
+    expect(database.listCards(project.id).some(card => card.content.includes("今天开放"))).toBe(true);
   } finally { database.close(); }
 });

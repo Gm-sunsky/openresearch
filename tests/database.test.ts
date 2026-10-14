@@ -317,3 +317,18 @@ it("upgrades a version-10 profile without losing old text or uncaptained images"
   const persisted = new SQL.Database(readFileSync(filePath));
   expect(persisted.exec("PRAGMA user_version")[0].values[0][0]).toBe(11); persisted.close();
 });
+it("compacts legacy generated gaps on read without changing hand-written notes or stored evidence", async () => {
+  const { database, filePath, wasmPath } = await createDatabase();
+  const project = database.createProject({ name: "监测", description: "监测", goal: "状态", focus: ["状态"], updateFrequency: "daily" });
+  const content = "• 项目甲：截至本次更新，已核对 6 条来源材料，但没有找到可直接支持“状态”的证据。\n• 项目乙：官方宣布没有开放。";
+  const generated = database.createCard({ projectId: project.id, type: "analysis", title: "状态", content, focusCategory: "状态", updateBatchId: "legacy-batch" });
+  const note = database.createCard({ projectId: project.id, type: "note", title: "笔记", content });
+  expect(generated.content).toBe("• 项目甲：未知\n• 项目乙：官方宣布没有开放。");
+  expect(generated.summary).toContain("官方宣布没有开放");
+  expect(note.content).toBe(content);
+  database.close();
+  const SQL = await initSqlJs({ locateFile: () => wasmPath });
+  const raw = new SQL.Database(readFileSync(filePath));
+  expect(raw.exec("SELECT content FROM cards WHERE id = '" + generated.id + "'")[0].values[0][0]).toBe(content);
+  raw.close();
+});

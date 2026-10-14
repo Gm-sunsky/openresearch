@@ -4,9 +4,9 @@
 
 [Download](https://github.com/Gm-sunsky/openresearch/releases/latest) · [Report an issue](https://github.com/Gm-sunsky/openresearch/issues)
 
-OpenResearch is a local-first AI research workspace for Windows and macOS. Describe a topic, discover sources, and organize evidence on a persistent research board. Current version: **1.6.4**.
+OpenResearch is a local-first AI research workspace for Windows and macOS. Describe a topic, discover sources, and organize evidence on a persistent research board. Current version: **1.6.5**.
 
-Version 1.6.4 implements the approved UI: graphite/warm-white system themes, project automation indicators, layered board tools, a clear inspector, and a contents/article/gallery reader. Existing data, packs, scheduling, and input fixes are preserved. See [release notes](docs/RELEASE_NOTES_V1_6_4.md).
+Version 1.6.5 uses concise Unknown states, retries interrupted source reads, adds native DeepSeek web search, and makes launch-at-login status easier to verify. See [release notes](docs/RELEASE_NOTES_V1_6_5.md).
 
 ## Features
 
@@ -102,3 +102,11 @@ No open-source license has been granted in this repository. Publication alone do
 ## Reading full material
 
 Double-click a card or use its full-reader button. Scroll with the wheel or Up/Down, turn pack pages with Left/Right or toolbar buttons, and close with Escape. Cards show independent concise overviews and core images supported by actual captions; unknown images and full saved research text remain in the reader. Older text discarded before storage requires a new research update. See the release notes for the input diagnosis and verification limits.
+
+## DeepSeek web search
+
+Official DeepSeek configurations (`https://api.deepseek.com`) automatically use the same key/model with the Anthropic-compatible server search endpoint, regardless of the normal Chat/Responses setting. OpenAI uses Responses `web_search`. Third-party proxy hosts are not automatically routed to DeepSeek.
+
+DeepSeek's [Responses guide](https://api-docs.deepseek.com/guides/responses_api/) marks built-in web search as ignored, while its [Claude Code guide](https://api-docs.deepseek.com/quick_start/agent_integrations/claude_code/) documents native search. OpenResearch uses `https://api.deepseek.com/anthropic/v1/messages` and accepts only URLs backed by actual tool results. Search can incur extra model token costs. Unsupported providers and network/service failures remain visible; ordinary web/RSS collection works independently.
+
+Missing evidence is displayed as Unknown. Confirmed negative facts and conflicting reports are retained. Legacy generated missing-evidence boilerplate is compacted on read, without rewriting the original database or hand-written notes.

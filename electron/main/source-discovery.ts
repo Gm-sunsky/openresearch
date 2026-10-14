@@ -15,6 +15,7 @@ import { assertPublicSourceUrl, fetchPublicUrl, normalizeDiscoveredUrl } from ".
 import { buildDiscoveryQueries, buildResearchWorkflow } from "./research-workflow";
 
 import { mapConcurrent } from "./concurrency";
+import { normalizeNetworkError, requestWithRetry } from "./network-request";
 
 interface CandidateDraft {
   type: SourceType;
@@ -325,12 +326,16 @@ export class SourceDiscoveryAgent {
       const candidates: CandidateDraft[] = [];
       try {
         const url = `https://www.bing.com/search?format=rss&q=${encodeURIComponent(query)}`;
-        const response = await fetchPublicUrl(url, {
-          signal: AbortSignal.timeout(15_000),
+        const body = await requestWithRetry(url, {
           headers: { accept: "application/rss+xml, application/xml, text/xml" },
-        }, this.fetchImpl);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const items = parseFeed(await response.text()).slice(0, 8);
+        }, {
+          timeoutMs: 15_000,
+          fetchImpl: (target, init) => fetchPublicUrl(String(target), init ?? {}, this.fetchImpl),
+        }, async (response) => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return response.text();
+        });
+        const items = parseFeed(body).slice(0, 8);
         for (const item of items) {
           let normalized: string;
           try { normalized = normalizeDiscoveredUrl(item.link); } catch { continue; }
@@ -351,7 +356,7 @@ export class SourceDiscoveryAgent {
         }
         return { candidates, warning: null };
       } catch (error) {
-        return { candidates, warning: `公开搜索暂不可用：${error instanceof Error ? error.message : "未知错误"}` };
+        return { candidates, warning: `公开搜索暂不可用：${normalizeNetworkError(error)}` };
       }
     });
     warnings.push(...results.flatMap((result) => result.warning ? [result.warning] : []));
@@ -420,13 +425,13 @@ export class SourceDiscoveryAgent {
     const results = await mapConcurrent(sources.slice(0, 4), 4, async (source) => {
       const candidates: CandidateDraft[] = [];
       try {
-        const response = await this.fetchImpl(source.url, {
+        const page = await requestWithRetry(source.url, {
           headers: { accept: "text/html,application/xhtml+xml" },
-          signal: AbortSignal.timeout(10_000),
+        }, { timeoutMs: 10_000, fetchImpl: this.fetchImpl }, async (response) => {
+          if (!response.ok) return null;
+          return { html: await response.text(), url: response.url || source.url };
         });
-        if (!response.ok) return { candidates, warning: null };
-        const html = await response.text();
-        if (html.length <= 2_000_000) candidates.push(...discoverFeedLinks(html, response.url || source.url));
+        if (page && page.html.length <= 2_000_000) candidates.push(...discoverFeedLinks(page.html, page.url));
         return { candidates, warning: null };
       } catch {
         return { candidates, warning: `${source.name}：无法检查页面中的订阅链接` };
@@ -440,19 +445,21 @@ export class SourceDiscoveryAgent {
     try {
       const url = await assertPublicSourceUrl(candidate.url);
       if (candidate.type === "search") return true;
-      let response = await fetchPublicUrl(url, {
-        method: "HEAD",
-        signal: AbortSignal.timeout(8_000),
-      }, this.fetchImpl);
-      if (response.status === 405 || response.status === 403) {
-        response = await fetchPublicUrl(url, {
-          headers: { range: "bytes=0-1024" },
-          signal: AbortSignal.timeout(8_000),
-        }, this.fetchImpl);
-        await response.body?.cancel();
+      const fetchOptions = {
+        timeoutMs: 8_000,
+        fetchImpl: (target: string | URL | Request, init?: RequestInit) => fetchPublicUrl(String(target), init ?? {}, this.fetchImpl),
+      };
+      let status = await requestWithRetry(url, { method: "HEAD" }, fetchOptions, async (response) => {
+        if (response.url) await assertPublicSourceUrl(response.url);
+        return response.status;
+      });
+      if (status === 405 || status === 403) {
+        status = await requestWithRetry(url, { headers: { range: "bytes=0-1024" } }, fetchOptions, async (response) => {
+          if (response.url) await assertPublicSourceUrl(response.url);
+          return response.status;
+        });
       }
-      if (response.url) await assertPublicSourceUrl(response.url);
-      return response.ok;
+      return status >= 200 && status < 300;
     } catch {
       return false;
     }

@@ -8,7 +8,7 @@ OpenResearch 是一个本地优先的 Windows 与 macOS 信息项目工作台。
 
 ## 当前版本
 
-V1.6.4 按视觉方案更新研究工作台：统一石墨灰与暖白双主题、项目导航和自动更新状态、分层白板工具栏、上下文右栏，以及目录/正文/图库三栏资料窗口。保留已有数据、卡包和自动更新功能。保留项目搜索、数据目录打开、系统深浅色及时间线。[版本说明](docs/RELEASE_NOTES_V1_6_4.md)。
+V1.6.5 将未确认的信息精简为“未知”，修复来源中断后的有限重试，并接入 DeepSeek 官方联网搜索路径。自启动状态现在更清晰，并提供重新读取入口。[版本说明](docs/RELEASE_NOTES_V1_6_5.md)。
 
 已实现：
 
@@ -135,7 +135,9 @@ API 与来源发现的边界、接口和安全策略见 [API 与来源发现设�
 
 从项目拆解、检索矩阵、证据分层、交叉核验到二次信息输出的完整规范见 [通用信息搜集流程 V1](docs/GENERAL_RESEARCH_WORKFLOW_V1.md)。
 
-新媒体账号搜索使用 Responses API 的 `web_search` 工具。普通网页和 RSS 不依赖该工具；X、Instagram、YouTube、B站等搜索型来源需要配置支持网页搜索的 API 与模型。
+普通网页和 RSS 直接读取来源；搜索型来源与研究矩阵需要可用的联网搜索服务。OpenAI 使用 Responses 的 `web_search`；官方 DeepSeek 地址 `https://api.deepseek.com` 则自动使用同一密钥和模型调用 Anthropic 兼容搜索接口，无需手动更改现有 Chat／Responses 设置。仅接受实际搜索工具返回的来源链接，找不到有效证据时显示“未知”。其他兼容服务不能仅凭“支持 Responses”认定支持联网。
+
+DeepSeek 的 [Responses 兼容说明](https://api-docs.deepseek.com/zh-cn/guides/responses_api/)目前标注忽略内置 `web_search`；[Claude Code 接入说明](https://api-docs.deepseek.com/zh-cn/quick_start/agent_integrations/claude_code/)说明支持原生搜索。本软件使用 `https://api.deepseek.com/anthropic/v1/messages` 的服务端搜索工具。搜索可能产生额外模型 Token 费用，支持情况以服务商当前能力为准。第三方中转地址不会自动接收此官方接口的搜索请求。
 
 ## 已知边界
 

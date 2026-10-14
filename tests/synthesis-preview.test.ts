@@ -14,13 +14,13 @@ describe("independent synthesis overview", () => {
     expect(overview).toContain("1有分歧");
     expect(overview).toContain("作品甲：8月24日播出");
     expect(overview).toContain("作品乙：分歧");
-    expect(overview).toContain("作品丙：缺证据");
+    expect(overview).toContain("作品丙：未知");
   });
   it("does not silently accept a preview that only covers the first entity", () => {
     expect(synthesisOverview({ summary: "", coverage: [
       { entity: "甲", status: "confirmed", statement: "已开放。" },
       { entity: "乙", status: "no_evidence", statement: "缺证据。" },
-    ] }, "zh-CN", "甲已开放")).toContain("乙：缺证据");
+    ] }, "zh-CN", "甲已开放")).toContain("乙：未知");
   });
   it("selects core images but retains uncaptained and background images for the reader", () => {
     const overview = synthesisOverview({ summary: "Falcon rocket launch confirmed.\nMuseum restoration background." }, "en", "Falcon rocket launch confirmed.");
@@ -41,7 +41,7 @@ it("does not turn an evidence gap into a confident independent preview", () => {
     { entity: "甲", status: "confirmed", statement: "已开放。" },
     { entity: "乙", status: "no_evidence", statement: "没有可靠证据。" },
   ] }, "zh-CN", "甲乙均已确认开放。");
-  expect(preview).toContain("乙：缺证据");
+  expect(preview).toContain("乙：未知");
 });
 
 it("keeps decimal prices and dotted dates intact in extractive overviews", () => {

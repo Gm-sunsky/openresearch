@@ -139,3 +139,22 @@ it("updates the surviving sidebar when the settings control closes before a syst
   expect(host.querySelector<HTMLInputElement>("#sidebar-launch-at-login")!.checked).toBe(true);
   expect(host.querySelector('[role="status"]')!.textContent).toBe("startupEnabled");
 });
+
+it("reports an unchanged backend result instead of silently leaving an empty checkbox", async () => {
+  mock.get.mockResolvedValue(state);
+  mock.set.mockResolvedValue(state);
+  await act(async () => root.render(createElement(StartupControl, { compact: true })));
+  await act(async () => host.querySelector<HTMLInputElement>("input")!.click());
+  expect(host.querySelector('[role="alert"]')!.textContent).toContain("startupFailed");
+  expect(host.querySelector<HTMLInputElement>("input")!.checked).toBe(false);
+});
+it("offers a visible system refresh even after a successful read", async () => {
+  mock.get.mockResolvedValue(state);
+  await act(async () => root.render(createElement(StartupControl, { compact: true })));
+  const checkbox = host.querySelector<HTMLInputElement>("input")!;
+  expect(checkbox.getAttribute("aria-describedby")).toBe(host.querySelector('[role="status"]')!.id);
+  mock.get.mockResolvedValue({ ...state, enabled: true });
+  await act(async () => host.querySelector<HTMLButtonElement>("button")!.click());
+  expect(checkbox.checked).toBe(true);
+  expect(host.querySelector('[role="status"]')!.textContent).toBe("startupEnabled");
+});

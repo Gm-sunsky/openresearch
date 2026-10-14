@@ -123,8 +123,8 @@ describe("local information depth", () => {
     const card = database.listCards(project.id).find((item) => item.updateBatchId === result.runId)!;
     expect(card.sourceLinks).toEqual([]);
     expect(card.content).not.toContain("蛋糕");
-    expect(card.content).toContain("覆盖不足");
-    expect(card.content).toContain("可信度：低");
+    expect(card.content).toContain("未知");
+    expect(card.content).toBe("未知");
   });
 
   it("covers every entity beyond eight high-ranked results within the focused budget", async () => {

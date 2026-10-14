@@ -159,3 +159,9 @@
 @media (prefers-reduced-motion: reduce) {
   .research-card, .card-switch-content, .card-pack-shell, .primary-button { animation: none; transition: none; }
 }
+
+/* Keep OS startup state readable beside the small sidebar control. */
+.startup-control .startup-state { font-size: 11px; line-height: 1.6; padding: 5px 7px; border-radius: 5px; background: var(--surface-hover); color: var(--text-primary); }
+.startup-control .startup-state[data-enabled="true"] { background: var(--accent-soft); }
+.startup-refresh { margin-top: 4px; font-size: 11px; color: var(--text-secondary); }
+.startup-refresh:disabled { opacity: .5; cursor: wait; }

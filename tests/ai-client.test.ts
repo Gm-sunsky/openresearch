@@ -28,10 +28,10 @@ describe("AI API response parsing", () => {
     });
   });
 
-  it("enables server-side web search for DeepSeek V4 Flash Responses API", () => {
+  it("enables DeepSeek search independently of the configured generation protocol", () => {
     expect(supportsWebSearch({
       provider: "openai-compatible",
-      protocol: "responses",
+      protocol: "chat-completions",
       baseUrl: "https://api.deepseek.com",
       model: "deepseek-v4-flash",
       apiKey: "sk-test",
@@ -54,7 +54,7 @@ describe("AI API response parsing", () => {
     })).toBe(false);
   });
 
-  it("sends the required web search tool to DeepSeek source discovery", async () => {
+  it("uses authenticated Anthropic search for DeepSeek and rejects invented candidate URLs", async () => {
     const runtime: RuntimeAiSettings = {
       provider: "openai-compatible",
       protocol: "responses",
@@ -67,9 +67,18 @@ describe("AI API response parsing", () => {
     };
     const settings = { resolve: () => runtime } as unknown as ApiSettingsService;
     let requestBody: Record<string, unknown> | null = null;
-    const client = new AiApiClient(settings, async (_input, init) => {
+    const client = new AiApiClient(settings, async (input, init) => {
+      expect(input).toBe("https://api.deepseek.com/anthropic/v1/messages");
+      expect(init?.headers).toMatchObject({ "x-api-key": "sk-test" });
       requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
-      return new Response(JSON.stringify({ output_text: "[]" }), {
+      return new Response(JSON.stringify({ content: [
+        { type: "server_tool_use", id: "search-1", name: "web_search", input: { query: "独库公路" } },
+        { type: "web_search_tool_result", tool_use_id: "search-1", content: [{ type: "web_search_result", title: "交通运输厅", url: "https://jtyst.xinjiang.gov.cn/" }] },
+        { type: "text", text: JSON.stringify({ sources: [
+          { name: "交通运输厅", url: "https://jtyst.xinjiang.gov.cn/" },
+          { name: "虚构页面", url: "https://jtyst.xinjiang.gov.cn/invented" },
+        ] }) },
+      ], stop_reason: "end_turn" }), {
         status: 200,
         headers: { "content-type": "application/json" },
       });
@@ -93,20 +102,19 @@ describe("AI API response parsing", () => {
     expect(result.usedWebSearch).toBe(true);
     expect(requestBody).toMatchObject({
       model: "deepseek-v4-flash",
-      tools: [{ type: "web_search" }],
-      tool_choice: "required",
-      text: { format: { type: "json_schema", name: "source_candidates", strict: true } },
-      max_output_tokens: 8_000,
+      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 8 }],
+      max_tokens: 8_000,
     });
-    expect(String((requestBody as Record<string, unknown>).input)).toContain("<trusted_research_skill");
-    expect(String((requestBody as Record<string, unknown>).input)).toContain("## Quality gates");
+    expect(JSON.stringify((requestBody as Record<string, unknown>).messages)).toContain("<trusted_research_skill");
+    expect(JSON.stringify((requestBody as Record<string, unknown>).messages)).toContain("## Quality gates");
+    expect(JSON.parse(result.text).sources).toHaveLength(1);
   });
 
-  it("continues a stateless DeepSeek response after a web search call returns no final text", async () => {
+  it("continues a stateless Responses search after a tool call returns no final text", async () => {
     const runtime: RuntimeAiSettings = {
-      provider: "openai-compatible",
+      provider: "openai",
       protocol: "responses",
-      baseUrl: "https://api.deepseek.com",
+      baseUrl: "https://api.openai.com/v1",
       model: "deepseek-v4-flash",
       apiKey: "sk-test",
       autoDiscoverSources: true,
@@ -172,9 +180,9 @@ describe("AI API response parsing", () => {
 
   it("falls back to URLs returned by the search tool when continuation is also empty", async () => {
     const runtime: RuntimeAiSettings = {
-      provider: "openai-compatible",
+      provider: "openai",
       protocol: "responses",
-      baseUrl: "https://api.deepseek.com",
+      baseUrl: "https://api.openai.com/v1",
       model: "deepseek-v4-flash",
       apiKey: "sk-test",
       autoDiscoverSources: true,
@@ -215,11 +223,11 @@ describe("AI API response parsing", () => {
     });
   });
 
-  it("retries a truly empty DeepSeek response without structured output constraints", async () => {
+  it("retries a truly empty Responses payload without structured output constraints", async () => {
     const runtime: RuntimeAiSettings = {
-      provider: "openai-compatible",
+      provider: "openai",
       protocol: "responses",
-      baseUrl: "https://api.deepseek.com",
+      baseUrl: "https://api.openai.com/v1",
       model: "deepseek-v4-flash",
       apiKey: "sk-test",
       autoDiscoverSources: true,
@@ -252,7 +260,6 @@ describe("AI API response parsing", () => {
     expect(requestBodies[1]).not.toHaveProperty("text");
     expect(requestBodies[1]).toMatchObject({
       tool_choice: "required",
-      thinking: { type: "disabled" },
       max_output_tokens: 12_000,
     });
   });
@@ -762,7 +769,107 @@ describe("AI API response parsing", () => {
       focus: ["官方公告"],
     } as Project;
 
-    await expect(client.discoverSources(project)).rejects.toThrow(/API 请求超时（180 秒）/);
+    await expect(client.discoverSources(project)).rejects.toThrow(/请求超时（180 秒）/);
+  });
+});
+
+describe("DeepSeek native search evidence", () => {
+  const runtime = {
+    provider: "openai-compatible", protocol: "chat-completions", baseUrl: "https://api.deepseek.com/v1", model: "deepseek-flash",
+    apiKey: "sk-test", language: "zh-CN", autoDiscoverSources: true, autoAddVerifiedSources: false, updatedAt: null,
+  } as RuntimeAiSettings;
+  const project = { id: "road", name: "独库公路", description: "独库公路", goal: "掌握开放状态", focus: ["开放状态"] } as Project;
+  const url = "https://jtyst.xinjiang.gov.cn/road-open";
+  const evidence = { type: "web_search_tool_result", tool_use_id: "search-1", content: [{ type: "web_search_result", url, title: "开放公告" }] };
+  function clientWithPayloads(payloads: unknown[]) {
+    const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const client = new AiApiClient({ resolve: () => runtime } as unknown as ApiSettingsService, async (input, init) => {
+      requests.push({ url: input, body: JSON.parse(String(init?.body)) });
+      return new Response(JSON.stringify(payloads[Math.min(requests.length - 1, payloads.length - 1)]), { status: 200 });
+    });
+    return { client, requests };
+  }
+
+  it("searches matrix with a chat configuration and accepts only exact tool evidence URLs", async () => {
+    const item = { entity: "独库公路", task: "开放状态", title: "开放公告", summary: "交通部门发布开放公告。", source_name: "交通部门", evidence_tier: "primary", url };
+    const { client, requests } = clientWithPayloads([{ content: [evidence, { type: "text", text: JSON.stringify({ items: [item, { ...item, url: `${url}/invented` }] }) }] }]);
+    expect(client.canSearchWeb()).toBe(true);
+    const items = await client.searchResearchWorkflow(project);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ url, researchEntity: "独库公路", researchTask: "开放状态" });
+    expect(requests[0].url).toBe("https://api.deepseek.com/anthropic/v1/messages");
+    expect(requests[0].body).not.toHaveProperty("input");
+  });
+
+  it("uses native search for monitored accounts and keeps source attribution", async () => {
+    const { client } = clientWithPayloads([{ content: [evidence, { type: "text", text: JSON.stringify({ items: [{ source_index: 0, title: "开放公告", summary: "交通部门确认开放。", url }] }) }] }]);
+    const source = { id: "source", projectId: "road", type: "search", platform: "web", name: "交通部门", url: "https://jtyst.xinjiang.gov.cn/" } as Source;
+    expect(await client.searchLatestFromSources(project, [source])).toMatchObject([{ sourceIndex: 0, sourceName: "交通部门", url }]);
+  });
+
+  it("accepts omitted trailing slashes and fragments but restores the authoritative search URL", async () => {
+    const authoritativeUrl = "https://jtyst.xinjiang.gov.cn/road-open/?lang=zh#notice";
+    const item = { source_index: 0, title: "开放公告", summary: "交通部门确认开放。", url: "https://jtyst.xinjiang.gov.cn/road-open?lang=zh" };
+    const rejectedUrls = [
+      "https://jtyst.xinjiang.gov.cn/road-open?lang=en",
+      "https://jtyst.xinjiang.gov.cn/road-open/new?lang=zh",
+      "https://jtyst.xinjiang.gov.cn.evil.example/road-open?lang=zh",
+      "http://jtyst.xinjiang.gov.cn/road-open?lang=zh",
+      "https://user:secret@jtyst.xinjiang.gov.cn/road-open?lang=zh",
+    ];
+    const { client } = clientWithPayloads([{ content: [
+      { ...evidence, content: [{ type: "web_search_result", url: authoritativeUrl, title: "开放公告" }] },
+      { type: "text", text: JSON.stringify({ items: [item, ...rejectedUrls.map((candidate) => ({ ...item, url: candidate }))] }) },
+    ] }]);
+    const source = { id: "source", projectId: "road", type: "search", platform: "web", name: "交通部门", url: "https://jtyst.xinjiang.gov.cn/" } as Source;
+    const items = await client.searchLatestFromSources(project, [source]);
+    expect(items).toHaveLength(1);
+    expect(items[0].url).toBe(authoritativeUrl);
+  });
+
+  it("continues pause_turn with original server blocks and preserves evidence across turns", async () => {
+    const blocks = [{ type: "server_tool_use", name: "web_search", id: "search-1", input: { query: "独库公路" } }, evidence];
+    const { client, requests } = clientWithPayloads([
+      { stop_reason: "pause_turn", content: blocks },
+      { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ sources: [{ name: "交通部门", url }] }) }] },
+    ]);
+    expect(JSON.parse((await client.discoverSources(project)).text).sources).toHaveLength(1);
+    expect(requests).toHaveLength(2);
+    expect(requests[1].body.messages).toEqual(expect.arrayContaining([{ role: "assistant", content: blocks }]));
+    expect(requests[1].body.tools).toEqual(requests[0].body.tools);
+  });
+
+  it("repairs malformed output from the same search without permitting new evidence", async () => {
+    const { client, requests } = clientWithPayloads([
+      { content: [evidence, { type: "text", text: "Here are the results." }] },
+      { content: [{ type: "text", text: JSON.stringify({ sources: [{ name: "交通部门", url }, { name: "虚构", url: `${url}/invented` }] }) }] },
+    ]);
+    expect(JSON.parse((await client.discoverSources(project)).text).sources).toHaveLength(1);
+    expect(requests[1].body.tool_choice).toEqual({ type: "none" });
+  });
+
+  it("rejects a model-only answer instead of treating memorized URLs as live search", async () => {
+    const { client } = clientWithPayloads([{ content: [{ type: "text", text: JSON.stringify({ sources: [{ name: "交通部门", url }] }) }] }]);
+    await expect(client.discoverSources(project)).rejects.toThrow("未执行可验证的网页搜索");
+  });
+
+  it("reports server search errors clearly without retrying chargeable requests", async () => {
+    const { client, requests } = clientWithPayloads([{ content: [{ type: "web_search_tool_result", content: { type: "web_search_tool_result_error", error_code: "unavailable" } }] }]);
+    await expect(client.discoverSources(project)).rejects.toThrow("网页搜索暂不可用（unavailable）");
+    expect(requests).toHaveLength(1);
+  });
+
+  it("bounds paused search continuations", async () => {
+    const { client, requests } = clientWithPayloads([{ stop_reason: "pause_turn", content: [evidence] }]);
+    await expect(client.discoverSources(project)).rejects.toThrow("续接上限");
+    expect(requests).toHaveLength(4);
+  });
+
+  it("preserves the configured chat endpoint for non-search generation", async () => {
+    const { client, requests } = clientWithPayloads([{ choices: [{ message: { content: "OK" } }] }]);
+    await client.test({ provider: runtime.provider, protocol: runtime.protocol, baseUrl: runtime.baseUrl, model: runtime.model });
+    expect(requests[0].url).toBe("https://api.deepseek.com/v1/chat/completions");
+    expect(requests[0].body).not.toHaveProperty("tools");
   });
 });
 
@@ -917,7 +1024,7 @@ describe("research depth and evidence boundaries", () => {
     expect(bodies).toHaveLength(2);
     expect(String(bodies[1].input)).toContain("without valid evidence indexes");
     expect(result[0].coverage[0]).toMatchObject({ entity: "作品甲", status: "no_evidence", sourceIndexes: [] });
-    expect(result[0].coverage[0].statement).toContain("覆盖缺口");
+    expect(result[0].coverage[0].statement).toBe("未知");
     expect(result[0].sourceIndexes).toEqual([1]);
     expect(result[0].confidence).toBe("low");
     expect(result[0].summary).not.toContain("8月24日");
@@ -933,7 +1040,7 @@ describe("research depth and evidence boundaries", () => {
     expect(bodies).toHaveLength(1);
     expect(result.coverage[0]).toMatchObject({ status: "no_evidence", sourceIndexes: [] });
     expect(result.sourceIndexes).toEqual([1]);
-    expect(result.summary).toContain("覆盖缺口，不能据此认定无变化");
+    expect(result.summary).toContain("作品甲：未知");
     expect(result.confidence).toBe("low");
   });
 

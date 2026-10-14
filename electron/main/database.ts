@@ -1,3 +1,4 @@
+import { compactUnknownInformation } from "../../src/shared/unknown-information";
 import { synthesisOverview } from "../../src/shared/synthesis-preview";
 import { normalizeCardImages, summarizeCard } from "../../src/shared/card-presentation";
 import { createHash, randomUUID } from "node:crypto";
@@ -1050,13 +1051,22 @@ export class ResearchDatabase {
     try { storedImages = JSON.parse(asString(row.images_json) || "[]"); } catch { /* Legacy or corrupt metadata has no trusted captions. */ }
     const legacyImage = asNullableString(row.image_url);
     const images = normalizeCardImages([...(Array.isArray(storedImages) ? storedImages : []), ...(legacyImage ? [{ url: legacyImage, caption: null, relevance: "unverified" }] : [])]);
+    // Presentation-only normalization keeps original stored text and hand-written notes intact.
+    const rawContent = asString(row.content);
+    const language = /[\u4e00-\u9fff]/.test(rawContent) ? "zh-CN" : "en";
+    const generated = Boolean(asNullableString(row.update_batch_id) && asNullableString(row.focus_category));
+    const content = generated ? compactUnknownInformation(rawContent, language) : rawContent;
+    const rawSummary = asString(row.summary);
+    const summary = generated && content !== rawContent
+      ? synthesisOverview({ summary: content }, language)
+      : generated ? compactUnknownInformation(rawSummary, language) : rawSummary;
     return {
       id: asString(row.id),
       projectId: asString(row.project_id),
       type: asString(row.type) as Card["type"],
       title: asString(row.title),
-      content: asString(row.content),
-      summary: asString(row.summary) ? summarizeCard(asString(row.summary)) : synthesisOverview({ summary: asString(row.content) }, /[\u4e00-\u9fff]/.test(asString(row.content)) ? "zh-CN" : "en"),
+      content,
+      summary: summary ? summarizeCard(summary) : synthesisOverview({ summary: content }, language),
       images,
       imageUrl: images.find(image => image.relevance === "relevant")?.url ?? null,
       sourceUrl: asNullableString(row.source_url),

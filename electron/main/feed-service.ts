@@ -1,3 +1,5 @@
+import { compactUnknownInformation, coverageStatement, unknownLabel } from "../../src/shared/unknown-information";
+import { normalizeNetworkError, requestWithRetry } from "./network-request";
 import { informationDepthPolicy } from "../../src/shared/information-depth";
 import { mapConcurrent } from "./concurrency";
 import { XMLParser } from "fast-xml-parser";
@@ -219,19 +221,19 @@ export function extractCoreInformation(project: Project, title: string, value: s
 }
 
 async function fetchText(url: string, fetchImpl: FetchLike): Promise<string> {
-  const response = await fetchImpl(url, {
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  return requestWithRetry(url, {
     headers: {
       "user-agent": "OpenResearch/0.1 (+local desktop monitor)",
       accept: "text/html, application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
     },
+  }, { timeoutMs: REQUEST_TIMEOUT_MS, fetchImpl: (input, init) => fetchImpl(String(input), init) }, async (response) => {
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const declaredLength = Number(response.headers.get("content-length") ?? 0);
+    if (declaredLength > MAX_RESPONSE_BYTES) throw new Error("响应内容超过 5 MB 限制");
+    const text = await response.text();
+    if (Buffer.byteLength(text) > MAX_RESPONSE_BYTES) throw new Error("响应内容超过 5 MB 限制");
+    return text;
   });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const declaredLength = Number(response.headers.get("content-length") ?? 0);
-  if (declaredLength > MAX_RESPONSE_BYTES) throw new Error("响应内容超过 5 MB 限制");
-  const text = await response.text();
-  if (Buffer.byteLength(text) > MAX_RESPONSE_BYTES) throw new Error("响应内容超过 5 MB 限制");
-  return text;
 }
 
 function dedupeSourceLinks(links: CardSourceLink[]): CardSourceLink[] {
@@ -275,20 +277,16 @@ function focusForInformation(project: Project, item: Pick<CollectedInformation, 
 
 interface LocalSnapshotCopy {
   title(focus: string): string;
-  noReadable: string;
-  noMatch: string;
-  aiFailed(reason: string): string;
-  coverageGap(focus: string, evidenceCount: number, entities: string[]): string;
 }
 
 const LOCAL_SNAPSHOT_COPY: Record<Exclude<AppLanguage, "system">, LocalSnapshotCopy> = {
-  "zh-CN": { title: (focus) => `${focus}：最新状态`, noReadable: "• 本次没有采集到可读取的正文，请检查来源错误。", noMatch: "• 已采集到来源正文，但没有找到与该关注项直接匹配的内容。", aiFailed: () => "• 已根据本次采集证据生成本地核对结果。", coverageGap: (focus, count, entities) => `• 截至本次更新，已核对 ${count} 条来源材料，但没有找到可直接支持“${focus}”的证据。\n• 已检查对象：${entities.join("、")}。这表示当前来源覆盖不足，不代表确定没有变化。` },
-  en: { title: (focus) => `${focus}: latest snapshot`, noReadable: "• No readable source content was collected; check source errors.", noMatch: "• Source content was collected, but none matched this focus directly.", aiFailed: () => "• A reviewable local result was generated from the evidence collected in this update.", coverageGap: (focus, count, entities) => `• This update checked ${count} source items but found no evidence directly supporting “${focus}”.\n• Checked entities: ${entities.join(", ")}. This indicates a coverage gap, not proof that nothing changed.` },
-  ru: { title: (focus) => `${focus}: актуальная сводка`, noReadable: "• Читаемый текст источников не получен; проверьте ошибки источников.", noMatch: "• Текст источников получен, но прямого соответствия этой теме нет.", aiFailed: () => "• На основе собранных в этом обновлении данных сформирован локальный результат для проверки.", coverageGap: (focus, count, entities) => `• Проверено материалов: ${count}; прямых доказательств по теме «${focus}» не найдено.\n• Проверенные объекты: ${entities.join(", ")}. Это пробел в охвате, а не подтверждение отсутствия изменений.` },
-  fr: { title: (focus) => `${focus} : état actuel`, noReadable: "• Aucun contenu source lisible n’a été collecté ; vérifiez les erreurs.", noMatch: "• Du contenu a été collecté, mais aucun élément ne correspond directement à ce sujet.", aiFailed: () => "• Un résultat local vérifiable a été produit à partir des éléments collectés lors de cette mise à jour.", coverageGap: (focus, count, entities) => `• ${count} éléments ont été vérifiés, sans preuve directe pour « ${focus} ».\n• Entités vérifiées : ${entities.join(", ")}. Il s’agit d’une lacune de couverture, pas d’une preuve d’absence de changement.` },
-  de: { title: (focus) => `${focus}: aktueller Stand`, noReadable: "• Es wurden keine lesbaren Quelltexte erfasst; prüfen Sie die Quellenfehler.", noMatch: "• Quelltexte wurden erfasst, aber nichts passt direkt zu diesem Schwerpunkt.", aiFailed: () => "• Aus den in diesem Update gesammelten Belegen wurde ein lokal prüfbares Ergebnis erstellt.", coverageGap: (focus, count, entities) => `• ${count} Quellenbeiträge wurden geprüft, aber es gibt keinen direkten Beleg für „${focus}“.\n• Geprüfte Objekte: ${entities.join(", ")}. Dies ist eine Abdeckungslücke und kein Beweis dafür, dass sich nichts geändert hat.` },
-  ja: { title: (focus) => `${focus}：最新状況`, noReadable: "• 読み取れる本文を取得できませんでした。情報源のエラーを確認してください。", noMatch: "• 本文は取得できましたが、この注目項目に直接一致する内容は見つかりませんでした。", aiFailed: () => "• 今回収集した根拠から、確認可能なローカル結果を作成しました。", coverageGap: (focus, count, entities) => `• ${count}件の情報を確認しましたが、「${focus}」を直接裏付ける証拠は見つかりませんでした。\n• 確認対象：${entities.join("、")}。これは情報源のカバレッジ不足であり、変化がないことの証明ではありません。` },
-  ko: { title: (focus) => `${focus}: 최신 현황`, noReadable: "• 읽을 수 있는 출처 본문을 수집하지 못했습니다. 출처 오류를 확인하세요.", noMatch: "• 출처 본문은 수집했지만 이 관심 항목과 직접 일치하는 내용이 없습니다.", aiFailed: () => "• 이번 업데이트에서 수집한 근거로 검토 가능한 로컬 결과를 생성했습니다.", coverageGap: (focus, count, entities) => `• 자료 ${count}건을 확인했지만 “${focus}”를 직접 뒷받침하는 근거를 찾지 못했습니다.\n• 확인 대상: ${entities.join(", ")}. 이는 출처 범위 부족이며 변화가 없다는 증거가 아닙니다.` },
+  "zh-CN": { title: (focus) => `${focus}：最新状态` },
+  en: { title: (focus) => `${focus}: latest snapshot` },
+  ru: { title: (focus) => `${focus}: актуальная сводка` },
+  fr: { title: (focus) => `${focus} : état actuel` },
+  de: { title: (focus) => `${focus}: aktueller Stand` },
+  ja: { title: (focus) => `${focus}：最新状況` },
+  ko: { title: (focus) => `${focus}: 최신 현황` },
 };
 
 function localEvidenceText(item: CollectedInformation, focus: string, project: Project): string {
@@ -325,9 +323,8 @@ function localSynthesis(
       .map((item) => ({ item, score: focusScore(focusCategory, item), text: localEvidenceText(item, focusCategory, project) }))
       .filter((entry) => entry.score > 0 && entry.text)
       .sort((left, right) => right.score - left.score || right.item.suggestedImportance - left.item.suggestedImportance);
-    const status = failureReason ? copy.aiFailed(failureReason) : "";
     // Reserve every entity a visible row before spending the remaining space on detail.
-    const rowBudget = Math.floor((policy.maxCharacters - status.length - (status ? 1 : 0) - workflow.entities.length + 1) / workflow.entities.length);
+    const rowBudget = Math.floor((policy.maxCharacters - workflow.entities.length + 1) / workflow.entities.length);
     const factBudget = Math.max(1, Math.floor(policy.maxFacts / workflow.entities.length));
     const coverage = workflow.entities.map((entity) => {
       const entityEvidence = ranked.filter(({ item }) => item.researchEntity
@@ -337,7 +334,7 @@ function localSynthesis(
       const maxCharacters = Math.max(20, rowBudget - label.length - 3);
       const statement = entityEvidence.length
         ? limitResearchText(entityEvidence.map((entry) => entry.text.startsWith(entity) ? entry.text.slice(entity.length).trimStart() : entry.text).join("\n"), project.informationDepth, maxCharacters, factBudget, focusCategory)
-        : limitResearchText(items.length === 0 ? copy.noReadable : copy.coverageGap(focusCategory, items.length, [entity]), project.informationDepth, maxCharacters, factBudget, focusCategory);
+        : unknownLabel(language);
       return {
         entity,
         status: entityEvidence.length ? "confirmed" as const : "no_evidence" as const,
@@ -348,7 +345,7 @@ function localSynthesis(
     });
     const evidence = ranked.filter(({ item }) => coverage.some((row) => row.sourceIndexes.includes(item.index))).map(({ item }) => item);
     const strongest = evidence[0];
-    const summary = [status, ...coverage.map((row) => `• ${row.label}：${row.statement}`)].filter(Boolean).join("\n");
+    const summary = coverage.map((row) => `• ${row.label}：${row.statement}`).join("\n");
     const confidence: SynthesizedInformation["confidence"] = failureReason || coverage.some((row) => row.status === "no_evidence")
       || evidence.some((item) => item.evidenceTier === "community")
       ? "low"
@@ -395,16 +392,14 @@ function completeFocusSnapshots(
       coverage: workflow.entities.map((entity) => ({
         entity,
         status: "no_evidence" as const,
-        statement: copy.coverageGap(focusCategory, collectedItems.length, [entity]).replace(/^•\s*/, "").replace(/\n•\s*/g, " "),
+        statement: unknownLabel(language),
         sourceIndexes: [],
       })),
       asOf: new Date().toISOString(),
       confidence: "low",
       type: "analysis",
       title: copy.title(focusCategory),
-      summary: collectedItems.length > 0
-        ? copy.coverageGap(focusCategory, collectedItems.length, workflow.entities)
-        : copy.noReadable,
+      summary: unknownLabel(language),
       importance: 1,
       occurredAt: null,
       changeKind: "none",
@@ -424,8 +419,13 @@ function renderSynthesizedContent(decision: SynthesizedInformation, language: Ex
     ja: { asOf: "情報基準日", confidence: "信頼度", levels: { high: "高", medium: "中", low: "低" } },
     ko: { asOf: "근거 기준일", confidence: "신뢰도", levels: { high: "높음", medium: "중간", low: "낮음" } },
   };
+  const coverage = decision.coverage ?? [];
+  if (coverage.length && coverage.every(row => row.status === "no_evidence")) return unknownLabel(language);
   const copy = labels[language];
-  return `${decision.summary}\n• ${copy.asOf}：${decision.asOf}\n• ${copy.confidence}：${copy.levels[decision.confidence]}`;
+  const content = coverage.some(row => row.status === "no_evidence")
+    ? coverage.map(row => `• ${row.entity}：${coverageStatement(row, language)}`).join("\n")
+    : compactUnknownInformation(decision.summary, language);
+  return `${content}\n• ${copy.asOf}：${decision.asOf}\n• ${copy.confidence}：${copy.levels[decision.confidence]}`;
 }
 
 export class FeedService {
@@ -463,7 +463,7 @@ export class FeedService {
         try {
           return await this.collectSource(project, source);
         } catch (error) {
-          const message = error instanceof Error ? error.message : "未知错误";
+          const message = normalizeNetworkError(error);
           errors.push(source.name + "：" + message);
           this.database.updateSourceCheck(source.id, { status: "error", error: message });
           return [];
@@ -473,7 +473,7 @@ export class FeedService {
       const groups = Array.from({ length: Math.ceil(searchSources.length / 16) }, (_, index) => searchSources.slice(index * 16, index * 16 + 16));
       const searchWork = mapConcurrent(groups, 2, async (sourceGroup): Promise<CollectedInformation[]> => {
         try {
-          if (!this.ai?.canSearchWeb()) throw new Error("需要支持 web_search 的 Responses API");
+          if (!this.ai?.canSearchWeb()) throw new Error("请先配置可用的 AI 服务以执行网页搜索");
           const searchedItems = await this.ai.searchLatestFromSources(project, sourceGroup);
           const groupItems: CollectedInformation[] = [];
           for (const item of searchedItems) {
@@ -500,7 +500,7 @@ export class FeedService {
           }
           return groupItems;
         } catch (error) {
-          const message = error instanceof Error ? error.message : "新媒体搜索失败";
+          const message = normalizeNetworkError(error);
           for (const source of sourceGroup) {
             errors.push(source.name + "：" + message);
             this.database.updateSourceCheck(source.id, { status: "error", error: message });
@@ -522,7 +522,7 @@ export class FeedService {
             suggestedImportance: item.evidenceTier === "primary" || item.evidenceTier === "operator" ? 3 : 2,
           }));
         } catch (error) {
-          warnings.push("研究矩阵网页搜索失败：" + (error instanceof Error ? error.message : "未知错误"));
+          warnings.push("研究矩阵网页搜索失败：" + (normalizeNetworkError(error)));
           return [];
         }
       })();
@@ -624,7 +624,7 @@ export class FeedService {
     return result;
     } catch (error) {
       if (runId) this.database.finishTaskRun(runId, {
-        status: "failed", errors: [error instanceof Error ? error.message : "未知错误"], summary: "检查失败",
+        status: "failed", errors: [normalizeNetworkError(error)], summary: "检查失败",
       });
       throw error;
     } finally {
@@ -708,7 +708,7 @@ export class FeedService {
           return {
             entity,
             status: matching.length ? "confirmed" as const : "no_evidence" as const,
-            statement: matching.map(({ decision }) => decision.summary).join("\n") || LOCAL_SNAPSHOT_COPY[language].noMatch,
+            statement: matching.map(({ decision }) => decision.summary).join("\n") || unknownLabel(language),
             sourceIndexes: matching.map(({ item }) => item.index),
           };
         });
@@ -729,7 +729,7 @@ export class FeedService {
         };
       });
     } catch (error) {
-      const reason = error instanceof Error ? error.message : "未知错误";
+      const reason = normalizeNetworkError(error);
       warnings.push(`AI 综合整理失败，已保留来源提取结果并使用跨语言本地分类（${reason}）`);
       return localSynthesis(project, items, language, reason.slice(0, 180));
     }
